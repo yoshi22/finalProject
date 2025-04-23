@@ -1,16 +1,16 @@
-{% extends "base.html" %}
-{% block content %}
+{% extends "base.html" %}{% block content %}
 <h2>{{ playlist.name }}</h2>
 <ul>
-  {% for item in playlist.items.all %}
-    <li>
-      {{ item.track.title }} — {{ item.track.artist.name }}
-      <a href="{% url 'playlist_remove' playlist.pk item.track.pk %}">×</a>
-      · <a href="{% url 'track_detail' item.track.artist.name item.track.title %}">Play</a>
-    </li>
-  {% empty %}
-    <li>This playlist is empty.</li>
-  {% endfor %}
+{% for item in playlist.items.all %}
+  <li>
+    {{ item.track.title }} — {{ item.track.artist.name }}
+    <form action="{% url 'playlist_remove' playlist.pk item.track.pk %}" method="post" style="display:inline">
+      {% csrf_token %}<button style="font-size:0.8rem">×</button>
+    </form>
+    · <a href="{% url 'track_detail' item.track.artist.name item.track.title %}">Play</a>
+  </li>
+{% empty %}
+  <li>This playlist is empty.</li>
+{% endfor %}
 </ul>
-<a href="{% url 'playlist_list' %}">← Back to playlists</a>
-{% endblock %}
+<a href="{% url 'playlist_list' %}">← Back</a>{% endblock %}

@@ -20,5 +20,5 @@ from django.urls import include, path
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("music.urls")),
-    path("accounts/", include("django.contrib.auth.urls")),  # login/logout views
+    path("accounts/", include("django.contrib.auth.urls")),  # ログイン / ログアウト
 ]

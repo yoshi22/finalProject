@@ -3,13 +3,15 @@ from typing import Any
 
 import requests
 from django.conf import settings
+from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
+from .forms import SignUpForm
 from .models import Artist, Playlist, PlaylistTrack, Track
 
 # ------------------------------------------------------------------ #
-#  Last.fm helper
+# Last.fm helper
 # ------------------------------------------------------------------ #
 API_KEY = settings.LASTFM_API_KEY
 API_ROOT = settings.LASTFM_ROOT
@@ -30,15 +32,15 @@ def call_lastfm(params: dict[str, Any]) -> dict | None:
 
 
 # ------------------------------------------------------------------ #
-#  iTunes Search helper (30-second AAC preview)
+# iTunes 30-sec preview helper
 # ------------------------------------------------------------------ #
 ITUNES_URL = "https://itunes.apple.com/search"
 
 
 def itunes_preview(term: str) -> str | None:
-    params = {"term": term, "entity": "song", "limit": 1}
+    """Return previewUrl of first iTunes match (or None)."""
     try:
-        r = requests.get(ITUNES_URL, params=params, timeout=5)
+        r = requests.get(ITUNES_URL, params={"term": term, "entity": "song", "limit": 1}, timeout=5)
         data = r.json()
         if data.get("resultCount"):
             return data["results"][0]["previewUrl"]
@@ -48,15 +50,12 @@ def itunes_preview(term: str) -> str | None:
 
 
 # ------------------------------------------------------------------ #
-#  Top page
+# Public pages
 # ------------------------------------------------------------------ #
 def home(request):
     return render(request, "home.html")
 
 
-# ------------------------------------------------------------------ #
-#  Search, similar, chart
-# ------------------------------------------------------------------ #
 def track_search(request):
     q = request.GET.get("q")
     if not q:
@@ -67,17 +66,12 @@ def track_search(request):
 
 
 def similar(request):
-    art = request.GET.get("artist")
-    title = request.GET.get("track")
+    art, title = request.GET.get("artist"), request.GET.get("track")
     if not (art and title):
         return redirect("home")
-    data = call_lastfm(
-        {"method": "track.getSimilar", "artist": art, "track": title, "limit": 15}
-    )
+    data = call_lastfm({"method": "track.getSimilar", "artist": art, "track": title, "limit": 15})
     tracks = data["similartracks"]["track"] if data else []
-    return render(
-        request, "similar.html", {"base_track": f"{art} – {title}", "tracks": tracks}
-    )
+    return render(request, "similar.html", {"base_track": f"{art} – {title}", "tracks": tracks})
 
 
 def live_chart(request):
@@ -86,24 +80,18 @@ def live_chart(request):
     return render(request, "charts.html", {"tracks": tracks})
 
 
-def artist_detail(request, name):
+def artist_detail(request, name: str):
     data = call_lastfm({"method": "artist.getInfo", "artist": name, "lang": "en"})
     return render(request, "artist.html", {"a": data and data["artist"], "name": name})
 
 
-# ------------------------------------------------------------------ #
-#  Track detail (Last.fm info + iTunes preview)
-# ------------------------------------------------------------------ #
 def track_detail(request, artist: str, title: str):
     info = call_lastfm({"method": "track.getInfo", "artist": artist, "track": title})
     if not info:
         return render(request, "track.html", {"title": None})
-
     t = info["track"]
-    query = f"{artist} {title}"
-    preview = itunes_preview(query)
-
-    context = {
+    preview = itunes_preview(f"{artist} {title}")
+    ctx = {
         "title": t["name"],
         "artist": t["artist"]["name"],
         "url": t["url"],
@@ -111,11 +99,26 @@ def track_detail(request, artist: str, title: str):
         "summary": t.get("wiki", {}).get("summary", ""),
         "preview": preview,
     }
-    return render(request, "track.html", context)
+    return render(request, "track.html", ctx)
 
 
 # ------------------------------------------------------------------ #
-#  Playlist CRUD
+# Sign-up
+# ------------------------------------------------------------------ #
+def signup(request):
+    if request.method == "POST":
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect("home")
+    else:
+        form = SignUpForm()
+    return render(request, "registration/signup.html", {"form": form})
+
+
+# ------------------------------------------------------------------ #
+# Playlist CRUD
 # ------------------------------------------------------------------ #
 @login_required
 def playlist_list(request):
@@ -141,15 +144,12 @@ def playlist_detail(request, pk):
 @login_required
 def add_to_playlist(request, pk):
     pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
-    artist = request.GET.get("artist")
-    title = request.GET.get("track")
-    if not (artist and title):
-        return redirect("playlist_detail", pk=pk)
-    art_obj, _ = Artist.objects.get_or_create(name=artist)
-    track_obj, _ = Track.objects.get_or_create(title=title, artist=art_obj)
-    PlaylistTrack.objects.get_or_create(
-        playlist=pl, track=track_obj, position=pl.items.count()
-    )
+    artist = request.POST.get("artist")
+    title = request.POST.get("track")
+    if artist and title:
+        art, _ = Artist.objects.get_or_create(name=artist)
+        track, _ = Track.objects.get_or_create(title=title, artist=art)
+        PlaylistTrack.objects.get_or_create(playlist=pl, track=track, position=pl.items.count())
     return redirect("playlist_detail", pk=pk)
 
 

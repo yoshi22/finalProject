@@ -105,3 +105,8 @@ LASTFM_USER_AGENT = "NextTrackStudent/1.0"
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")  # ★追加
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# -- logout / logout redirect URL ----------------------------------------------
+LOGIN_REDIRECT_URL = "/"   # ログイン後はトップページへ
+LOGOUT_REDIRECT_URL = "/"  # ログアウト後もトップページへ
