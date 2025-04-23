@@ -1,24 +1,20 @@
 """
-Django settings for nexttrack (English-only version).
+Django settings for nexttrack project (playlist + YouTube-embed edition)
 """
-
 from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+# -------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env")  # read .env
 
-# -------------------------------------------------------------------
-# Security
-# -------------------------------------------------------------------
+# -- security --------------------------------------------------------
 SECRET_KEY = os.getenv("DJANGO_SECRET", "CHANGE_ME_FOR_PRODUCTION")
 DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if not DEBUG else []
 
-# -------------------------------------------------------------------
-# Installed apps
-# -------------------------------------------------------------------
+# -- apps ------------------------------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -30,9 +26,7 @@ INSTALLED_APPS = [
     "music",
 ]
 
-# -------------------------------------------------------------------
-# Middleware / URL routing
-# -------------------------------------------------------------------
+# -- middleware / URL -----------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -45,9 +39,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "nexttrack.urls"
 
-# -------------------------------------------------------------------
-# Templates
-# -------------------------------------------------------------------
+# -- templates -------------------------------------------------------
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -67,9 +59,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "nexttrack.wsgi.application"
 
-# -------------------------------------------------------------------
-# Database
-# -------------------------------------------------------------------
+# -- database --------------------------------------------------------
 DATABASES = {
     "default": {
         "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
@@ -77,17 +67,13 @@ DATABASES = {
     }
 }
 
-# -------------------------------------------------------------------
-# Internationalization
-# -------------------------------------------------------------------
+# -- i18n / tz -------------------------------------------------------
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Tokyo"
 USE_I18N = True
 USE_TZ = True
 
-# -------------------------------------------------------------------
-# Static & Media
-# -------------------------------------------------------------------
+# -- static / media --------------------------------------------------
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -95,9 +81,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# -------------------------------------------------------------------
-# Caching (local memory for development)
-# -------------------------------------------------------------------
+# -- cache -----------------------------------------------------------
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -105,9 +89,7 @@ CACHES = {
     }
 }
 
-# -------------------------------------------------------------------
-# Logging
-# -------------------------------------------------------------------
+# -- logging ---------------------------------------------------------
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -115,11 +97,11 @@ LOGGING = {
     "root": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "INFO")},
 }
 
-# -------------------------------------------------------------------
-# Last.fm settings
-# -------------------------------------------------------------------
+# -- external API keys ----------------------------------------------
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY", "")
 LASTFM_ROOT = "http://ws.audioscrobbler.com/2.0/"
 LASTFM_USER_AGENT = "NextTrackStudent/1.0"
+
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")  # ★追加
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

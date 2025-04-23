@@ -1,14 +1,16 @@
 import logging
 import math
-import requests
-from collections import Counter
 from typing import Any
 
+import requests
 from django.conf import settings
-from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404, redirect, render
+
+from .models import Artist, Playlist, PlaylistTrack, Track
 
 # ------------------------------------------------------------------ #
-#  Last.fm API helper
+#  Last.fm helper
 # ------------------------------------------------------------------ #
 API_KEY = settings.LASTFM_API_KEY
 API_ROOT = settings.LASTFM_ROOT
@@ -30,7 +32,35 @@ def call_lastfm(params: dict[str, Any]) -> dict | None:
 
 
 # ------------------------------------------------------------------ #
-#  Standard views (search / similar / artist / chart)
+#  YouTube helper (search + first video)
+# ------------------------------------------------------------------ #
+YT_KEY = settings.YOUTUBE_API_KEY
+YT_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
+
+
+def search_youtube(query: str) -> str | None:
+    if not YT_KEY:
+        return None
+    params = {
+        "part": "id",
+        "type": "video",
+        "maxResults": 1,
+        "q": query,
+        "key": YT_KEY,
+    }
+    try:
+        res = requests.get(YT_SEARCH_URL, params=params, timeout=5)
+        data = res.json()
+        items = data.get("items")
+        if items:
+            return items[0]["id"]["videoId"]
+    except Exception as exc:
+        logging.warning("YouTube API error: %s", exc)
+    return None
+
+
+# ------------------------------------------------------------------ #
+#  Basic search / similar / chart
 # ------------------------------------------------------------------ #
 def home(request):
     return render(request, "home.html")
@@ -58,7 +88,7 @@ def similar(request):
     )
 
 
-def artist_detail(request, name: str):
+def artist_detail(request, name):
     data = call_lastfm({"method": "artist.getInfo", "artist": name, "lang": "en"})
     return render(request, "artist.html", {"a": data and data["artist"], "name": name})
 
@@ -70,74 +100,70 @@ def live_chart(request):
 
 
 # ------------------------------------------------------------------ #
-#  New: Deep-Cut recommendation view
+#  Track detail + YouTube embed
 # ------------------------------------------------------------------ #
-def recommend(request):
-    """Recommend lesser-known yet similar tracks (tag-hybrid scoring)."""
-    seed_artist = request.GET.get("artist")
-    seed_title = request.GET.get("track")
-    if not (seed_artist and seed_title):
-        return redirect("home")
+def track_detail(request, artist: str, title: str):
+    info = call_lastfm({"method": "track.getInfo", "artist": artist, "track": title})
+    if not info:
+        return render(request, "track.html", {"title": None})
 
-    # (1) initial similar list
-    sim_json = call_lastfm(
-        {
-            "method": "track.getSimilar",
-            "artist": seed_artist,
-            "track": seed_title,
-            "limit": 100,
-        }
+    t = info["track"]
+    query = f"{artist} {title}"
+    video_id = search_youtube(query)
+
+    context = {
+        "title": t["name"],
+        "artist": t["artist"]["name"],
+        "url": t["url"],
+        "playcount": int(t.get("playcount", 0)),
+        "summary": t.get("wiki", {}).get("summary", ""),
+        "video_id": video_id,
+        "query": query,
+    }
+    return render(request, "track.html", context)
+
+
+# ------------------------------------------------------------------ #
+#  Playlist CRUD
+# ------------------------------------------------------------------ #
+@login_required
+def playlist_list(request):
+    return render(request, "playlist_list.html", {"playlists": request.user.playlists.all()})
+
+
+@login_required
+def playlist_create(request):
+    if request.method == "POST":
+        name = request.POST.get("name")
+        if name:
+            Playlist.objects.create(owner=request.user, name=name)
+        return redirect("playlist_list")
+    return render(request, "playlist_create.html")
+
+
+@login_required
+def playlist_detail(request, pk):
+    pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
+    return render(request, "playlist_detail.html", {"playlist": pl})
+
+
+@login_required
+def add_to_playlist(request, pk):
+    pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
+    artist = request.GET.get("artist")
+    title = request.GET.get("track")
+    if not (artist and title):
+        return redirect("playlist_detail", pk=pk)
+    art_obj, _ = Artist.objects.get_or_create(name=artist)
+    track_obj, _ = Track.objects.get_or_create(title=title, artist=art_obj)
+    PlaylistTrack.objects.get_or_create(
+        playlist=pl, track=track_obj, position=pl.items.count()
     )
-    if not sim_json:
-        return render(
-            request,
-            "recommend.html",
-            {"base": f"{seed_artist} – {seed_title}", "recs": []},
-        )
+    return redirect("playlist_detail", pk=pk)
 
-    # seed track tags
-    seed_info = call_lastfm(
-        {"method": "track.getInfo", "artist": seed_artist, "track": seed_title}
-    )
-    seed_tags = {
-        tag["name"] for tag in seed_info["track"]["toptags"]["tag"]
-    } if seed_info else set()
 
-    recs: list[dict[str, Any]] = []
-
-    # (2) evaluate first 50 candidates to save quota
-    for t in sim_json["similartracks"]["track"][:50]:
-        cand_artist = t["artist"]["name"]
-        cand_title = t["name"]
-        info = call_lastfm(
-            {"method": "track.getInfo", "artist": cand_artist, "track": cand_title}
-        )
-        if not info:
-            continue
-        cand = info["track"]
-        playcount = int(cand.get("playcount", 0))
-        tags = {tg["name"] for tg in cand.get("toptags", {}).get("tag", [])}
-
-        # (3) score components
-        match_score = float(t["match"])  # 0-1
-        tag_score = len(seed_tags & tags) / (len(seed_tags) or 1)  # 0-1
-        pop_penalty = math.log10(playcount + 10) / 7  # ≒0-1  (10→0, 10M→1)
-
-        score = 0.6 * match_score + 0.4 * tag_score - 0.3 * pop_penalty
-        recs.append(
-            {
-                "title": cand_title,
-                "artist": cand_artist,
-                "url": cand["url"],
-                "score": round(score, 3),
-                "playcount": playcount,
-            }
-        )
-
-    # (4) top 10
-    recs = sorted(recs, key=lambda x: x["score"], reverse=True)[:10]
-    return render(
-        request,
-        "recommend.html",
-        {"base": f"{seed_artist} – {seed_title}", "recs": recs},
-    )
+@login_required
+def remove_from_playlist(request, pk, track_id):
+    pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
+    PlaylistTrack.objects.filter(playlist=pl, track_id=track_id).delete()
+    return redirect("playlist_detail", pk=pk)

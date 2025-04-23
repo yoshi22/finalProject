@@ -1,19 +1,18 @@
-{% extends "base.html" %}
-{% block content %}
+{% extends "base.html" %}{% block content %}
 <h2>Results for “{{ query }}”</h2>
 <div class="grid">
   {% for t in tracks %}
     <div class="card">
       <h3>{{ t.name }}</h3>
       <p class="meta">{{ t.artist }}</p>
-      <a href="{% url 'similar' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">Similar tracks</a>
-      ·
-      <a href="{% url 'recommend' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">Deep-Cut recommend</a>
-      ·
-      <a href="{% url 'artist' t.artist %}">Artist details</a>
+      <a href="{% url 'similar' %}?artist={{ t.artist }}&track={{ t.name }}">Similar</a> ·
+      <a href="{% url 'recommend' %}?artist={{ t.artist }}&track={{ t.name }}">Deep-Cut</a> ·
+      <a href="{% url 'track_detail' t.artist t.name %}">Play</a>
+      {% if request.user.is_authenticated %}
+        <form action="{% url 'playlist_add' 1 %}"  method="get" style="margin-top:4px">
+          <!-- Example adds to first playlist -->
+        </form>
+      {% endif %}
     </div>
-  {% empty %}
-    <p>No results found.</p>
-  {% endfor %}
-</div>
-{% endblock %}
+  {% empty %}<p>No results.</p>{% endfor %}
+</div>{% endblock %}

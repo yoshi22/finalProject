@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block content %}
+{% if title %}
+  <h2>{{ title }}</h2>
+  <p class="meta">{{ artist }} · Plays: {{ playcount|intcomma }}</p>
+
+  {% if video_id %}
+    <iframe width="360" height="215"
+            src="https://www.youtube.com/embed/{{ video_id }}"
+            allowfullscreen></iframe>
+  {% else %}
+    <p><em>No playable video found for “{{ query }}”.</em></p>
+  {% endif %}
+
+  <div class="card" style="margin-top:1rem">{{ summary|safe }}</div>
+{% else %}
+  <p>Could not fetch track information.</p>
+{% endif %}
+{% endblock %}
