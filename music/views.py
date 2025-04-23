@@ -1,4 +1,4 @@
-import logging
+import logging, json
 from typing import Any
 
 import requests
@@ -6,8 +6,9 @@ from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import HttpResponseBadRequest
 
-from .forms import SignUpForm
+from .forms import SignUpForm, PlaylistRenameForm, AddTrackForm
 from .models import Artist, Playlist, PlaylistTrack, Track
 
 # ------------------------------------------------------------------ #
@@ -118,43 +119,83 @@ def signup(request):
 
 
 # ------------------------------------------------------------------ #
-# Playlist CRUD
+#  Playlist CRUD + reorder/delete
 # ------------------------------------------------------------------ #
 @login_required
 def playlist_list(request):
+    if request.method == "POST":  # 削除
+        pk = request.POST.get("delete_id")
+        get_object_or_404(Playlist, pk=pk, owner=request.user).delete()
     return render(request, "playlist_list.html", {"playlists": request.user.playlists.all()})
-
-
-@login_required
-def playlist_create(request):
-    if request.method == "POST":
-        name = request.POST.get("name")
-        if name:
-            Playlist.objects.create(owner=request.user, name=name)
-        return redirect("playlist_list")
-    return render(request, "playlist_create.html")
 
 
 @login_required
 def playlist_detail(request, pk):
     pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
-    return render(request, "playlist_detail.html", {"playlist": pl})
+
+    # --- 名前変更 ---
+    if "rename" in request.POST:
+        form = PlaylistRenameForm(request.POST, instance=pl)
+        if form.is_valid():
+            form.save()
+            return redirect("playlist_detail", pk=pk)
+
+    # --- 曲削除 ---
+    if "remove_track" in request.POST:
+        PlaylistTrack.objects.filter(playlist=pl, track_id=request.POST["remove_track"]).delete()
+
+    # --- 曲順更新 (JSON order=["3","1","2"]) ---
+    if "order" in request.POST:
+        try:
+            order = json.loads(request.POST["order"])
+            for idx, track_id in enumerate(order):
+                PlaylistTrack.objects.filter(playlist=pl, track_id=track_id).update(position=idx)
+        except Exception:
+            return HttpResponseBadRequest("Invalid order payload")
+
+    pl.refresh_from_db()
+    tracks = pl.items.select_related("track__artist")
+    rename_form = PlaylistRenameForm(instance=pl)
+    return render(request, "playlist_detail.html", {"playlist": pl, "tracks": tracks, "rename_form": rename_form})
 
 
 @login_required
-def add_to_playlist(request, pk):
-    pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
+def add_to_playlist(request):
+    """POST from search_results: choose existing or create new playlist."""
+    form = AddTrackForm(request.user, request.POST)
+    if not form.is_valid():
+        return redirect("search")  # fallback
+
     artist = request.POST.get("artist")
     title = request.POST.get("track")
-    if artist and title:
-        art, _ = Artist.objects.get_or_create(name=artist)
-        track, _ = Track.objects.get_or_create(title=title, artist=art)
-        PlaylistTrack.objects.get_or_create(playlist=pl, track=track, position=pl.items.count())
-    return redirect("playlist_detail", pk=pk)
+    if not (artist and title):
+        return redirect("search")
+
+    # 既存 or 新規プレイリスト
+    pl_choice = form.cleaned_data["playlist"]
+    if pl_choice == "__new__":
+        name = form.cleaned_data["new_name"] or "New Playlist"
+        pl = Playlist.objects.create(owner=request.user, name=name)
+    else:
+        pl = get_object_or_404(Playlist, pk=pl_choice, owner=request.user)
+
+    art, _ = Artist.objects.get_or_create(name=artist)
+    track, _ = Track.objects.get_or_create(title=title, artist=art)
+    PlaylistTrack.objects.get_or_create(playlist=pl, track=track, position=pl.items.count())
+    return redirect("playlist_detail", pk=pl.pk)
 
 
 @login_required
-def remove_from_playlist(request, pk, track_id):
+def playlist_create(request):
+    """Create a new playlist then redirect to list."""
+    if request.method == "POST":
+        name = request.POST.get("name") or "New Playlist"
+        Playlist.objects.create(owner=request.user, name=name)
+    return redirect("playlist_list")
+
+@login_required
+def remove_from_playlist(request, pk: int, track_id: int):
+    """Delete a single track from the playlist, then redirect back."""
     pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
     PlaylistTrack.objects.filter(playlist=pl, track_id=track_id).delete()
     return redirect("playlist_detail", pk=pk)

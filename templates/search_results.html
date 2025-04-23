@@ -7,12 +7,19 @@
     <p class="meta">{{ t.artist }}</p>
     <a href="{% url 'similar' %}?artist={{ t.artist }}&track={{ t.name }}">Similar</a> ·
     <a href="{% url 'track_detail' t.artist t.name %}">Play</a>
-    {% if request.user.is_authenticated and request.user.playlists.exists %}
-      <form action="{% url 'playlist_add' request.user.playlists.first.pk %}" method="post" style="margin-top:4px">
+    {% if request.user.is_authenticated %}
+      <form action="{% url 'playlist_add' %}" method="post" style="margin-top:6px">
         {% csrf_token %}
         <input type="hidden" name="artist" value="{{ t.artist }}">
         <input type="hidden" name="track" value="{{ t.name }}">
-        <button style="font-size:0.8rem">Add to first playlist</button>
+        <select name="playlist" onchange="this.nextElementSibling.style.display = this.value=='__new__'?'inline':'none'">
+          {% for pl in request.user.playlists.all %}
+            <option value="{{ pl.id }}">{{ pl.name }}</option>
+          {% endfor %}
+          <option value="__new__">＋ New playlist…</option>
+        </select>
+        <input name="new_name" style="display:none" placeholder="Playlist name">
+        <button>Add</button>
       </form>
     {% endif %}
   </div>
