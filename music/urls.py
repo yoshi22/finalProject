@@ -16,6 +16,6 @@ urlpatterns = [
     path("playlists/", views.playlist_list, name="playlist_list"),
     path("playlists/create/", views.playlist_create, name="playlist_create"),
     path("playlists/<int:pk>/", views.playlist_detail, name="playlist_detail"),
-    path("playlists/<int:pk>/add/", views.add_to_playlist, name="playlist_add"),
+    path("playlist/add/", views.add_to_playlist, name="playlist_add"),
     path("playlists/<int:pk>/remove/<int:track_id>/", views.remove_from_playlist, name="playlist_remove"),
 ]
