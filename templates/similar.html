@@ -1,13 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Tracks similar to “{{ base_track }}”</h2>
-<ul>
+<div class="grid">
   {% for t in tracks %}
-    <li>
-      <a href="{{ t.url }}" target="_blank">{{ t.name }}</a> — {{ t.artist.name }}
-    </li>
+    <div class="card">
+      <h3>{{ t.name }}</h3>
+      <p class="meta">{{ t.artist.name }}</p>
+      <a href="{{ t.url }}" target="_blank">Open on Last.fm</a>
+    </div>
   {% empty %}
-    <li>No similar tracks available.</li>
+    <p>No similar tracks available.</p>
   {% endfor %}
-</ul>
+</div>
 {% endblock %}

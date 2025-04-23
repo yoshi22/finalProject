@@ -3,11 +3,9 @@
 {% block content %}
 {% if a %}
   <h2>{{ a.name }}</h2>
-  <p>
-    Listeners: {{ a.stats.listeners|intcomma }} ·
-    Plays: {{ a.stats.playcount|intcomma }}
-  </p>
-  <h3>Top Tags</h3>
+  <p class="meta">Listeners: {{ a.stats.listeners|intcomma }} · Plays: {{ a.stats.playcount|intcomma }}</p>
+
+  <h3>Top tags</h3>
   <ul>
     {% for tag in a.tags.tag %}
       <li>{{ tag.name }}</li>
@@ -15,10 +13,10 @@
       <li>No tags.</li>
     {% endfor %}
   </ul>
+
   <h3>Biography</h3>
-  <div class="bio">{{ a.bio.summary|safe }}</div>
-  <p><a href="{{ a.url }}" target="_blank">View on Last.fm →</a></p>
+  <div class="card">{{ a.bio.summary|safe }}</div>
 {% else %}
-  <p>Failed to retrieve artist data.</p>
+  <p>Could not retrieve artist information.</p>
 {% endif %}
 {% endblock %}

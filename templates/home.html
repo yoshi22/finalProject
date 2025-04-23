@@ -1,11 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Track Search</h2>
-<form action="{% url 'search' %}" method="get">
-  <input name="q" size="40" placeholder="Enter song or artist" required>
+<form action="{% url 'search' %}" method="get" class="search-bar">
+  <input name="q" placeholder="Search songs or artists" required>
   <button>Search</button>
 </form>
-<p>
-  <a href="{% url 'charts' %}">View the current global top chart</a>
-</p>
+<p><a href="{% url 'charts' %}">Browse the current global chart →</a></p>
 {% endblock %}

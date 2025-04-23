@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Search results for “{{ query }}”</h2>
-<ul>
+<h2>Results for “{{ query }}”</h2>
+<div class="grid">
   {% for t in tracks %}
-    <li>
-      <strong>{{ t.name }}</strong> — {{ t.artist }}
-      · <a href="{% url 'similar' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">Similar tracks</a>
-      · <a href="{% url 'artist' t.artist|urlencode %}">Artist info</a>
-    </li>
+    <div class="card">
+      <h3>{{ t.name }}</h3>
+      <p class="meta">{{ t.artist }}</p>
+      <a href="{% url 'similar' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">Similar tracks</a>
+      <a href="{% url 'artist' t.artist|urlencode %}">Artist details</a>
+    </div>
   {% empty %}
-    <li>No results found.</li>
+    <p>No results found.</p>
   {% endfor %}
-</ul>
+</div>
 {% endblock %}

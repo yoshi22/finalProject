@@ -7,8 +7,18 @@
   <link rel="stylesheet" href="{% static 'style.css' %}">
 </head>
 <body>
-  <h1><a href="{% url 'home' %}">NextTrack 🎵</a></h1>
-  {% block content %}{% endblock %}
+  <header>
+    <a href="{% url 'home' %}" class="logo">NextTrack</a>
+    <nav>
+      <a href="{% url 'home' %}" class="{% if request.path == '/' %}active{% endif %}">Home</a>
+      <a href="{% url 'charts' %}" class="{% if request.path == '/charts/' %}active{% endif %}">Charts</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
   <footer>
     Powered by <a href="https://www.last.fm/api" target="_blank">Last.fm API</a>
   </footer>

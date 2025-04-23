@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% load humanize %}
 {% block content %}
-<h2>Current Global Top Tracks</h2>
-<ol>
+<h2>Global Top Tracks</h2>
+<div class="grid">
   {% for t in tracks %}
-    <li>
-      <a href="{{ t.url }}" target="_blank">{{ t.name }}</a>
-      — {{ t.artist.name }}
-      <span class="meta">(plays: {{ t.playcount|intcomma }})</span>
-    </li>
+    <div class="card">
+      <h3>{{ forloop.counter }}. {{ t.name }}</h3>
+      <p class="meta">{{ t.artist.name }} · Plays: {{ t.playcount|intcomma }}</p>
+      <a href="{{ t.url }}" target="_blank">Open on Last.fm</a>
+    </div>
   {% empty %}
-    <li>Chart data is unavailable at the moment.</li>
+    <p>Chart data unavailable.</p>
   {% endfor %}
-</ol>
+</div>
 {% endblock %}
