@@ -1,12 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Your Playlists</h2>
+
 <ul>
-  {% for pl in playlists %}
-    <li><a href="{% url 'playlist_detail' pl.pk %}">{{ pl.name }}</a></li>
-  {% empty %}
-    <li>No playlists yet.</li>
-  {% endfor %}
+{% for pl in playlists %}
+  <li>
+    <a href="{% url 'playlist_detail' pl.pk %}">{{ pl.name }}</a>
+    <!-- 削除ボタン -->
+    <form method="post" style="display:inline">
+      {% csrf_token %}
+      <input type="hidden" name="delete_id" value="{{ pl.pk }}">
+      <button
+        title="Delete playlist"
+        style="font-size:0.8rem;color:var(--primary);background:none;border:none;cursor:pointer">
+        ×
+      </button>
+    </form>
+  </li>
+{% empty %}
+  <li>No playlists yet.</li>
+{% endfor %}
 </ul>
-<a href="{% url 'playlist_create' %}">Create new playlist</a>
+
+<!-- 新規作成 -->
+<form action="{% url 'playlist_create' %}" method="post" style="margin-top:1rem">
+  {% csrf_token %}
+  <input name="name" placeholder="New playlist name" required>
+  <button>Create</button>
+</form>
 {% endblock %}

@@ -123,10 +123,17 @@ def signup(request):
 # ------------------------------------------------------------------ #
 @login_required
 def playlist_list(request):
-    if request.method == "POST":  # 削除
-        pk = request.POST.get("delete_id")
-        get_object_or_404(Playlist, pk=pk, owner=request.user).delete()
-    return render(request, "playlist_list.html", {"playlists": request.user.playlists.all()})
+    """
+    GET  : 自分のプレイリスト一覧を表示
+    POST : hidden フィールド delete_id を受け取ったらそのプレイリストを削除
+    """
+    if request.method == "POST":
+        delete_id = request.POST.get("delete_id")
+        if delete_id:
+            get_object_or_404(Playlist, pk=delete_id, owner=request.user).delete()
+
+    playlists = request.user.playlists.all()
+    return render(request, "playlist_list.html", {"playlists": playlists})
 
 
 @login_required
