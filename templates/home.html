@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% load static %}
 {% block content %}
-<h2>曲名検索</h2>
+<h2>Track Search</h2>
 <form action="{% url 'search' %}" method="get">
-  <input name="q" placeholder="曲名やアーティスト名" size="40" required>
+  <input name="q" size="40" placeholder="Enter song or artist" required>
   <button>Search</button>
 </form>
-<p><a href="{% url 'charts' %}">📈 グローバルトップチャートを見る</a></p>
+<p>
+  <a href="{% url 'charts' %}">View the current global top chart</a>
+</p>
 {% endblock %}

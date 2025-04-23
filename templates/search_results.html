@@ -1,16 +1,15 @@
 {% extends "base.html" %}
-{% load static %}
 {% block content %}
-<h2>「{{ query }}」の検索結果</h2>
+<h2>Search results for “{{ query }}”</h2>
 <ul>
   {% for t in tracks %}
     <li>
       <strong>{{ t.name }}</strong> — {{ t.artist }}
-      <a href="{% url 'similar' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">似ている曲</a> /
-      <a href="{% url 'artist' t.artist|urlencode %}">アーティスト情報</a>
+      · <a href="{% url 'similar' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">Similar tracks</a>
+      · <a href="{% url 'artist' t.artist|urlencode %}">Artist info</a>
     </li>
   {% empty %}
-    <li>見つかりませんでした</li>
+    <li>No results found.</li>
   {% endfor %}
 </ul>
 {% endblock %}

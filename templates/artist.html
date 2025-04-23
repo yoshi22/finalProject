@@ -1,34 +1,24 @@
 {% extends "base.html" %}
-{% load static humanize %}
+{% load humanize %}
 {% block content %}
-  {% if a %}
-    <h2>{{ a.name }} ― アーティスト情報</h2>
-
-    {% if a.image %}
-      <img src="{{ a.image.2.#text }}" alt="{{ a.name }} image"> {# 画像サイズ: large (index 2) #}
-    {% endif %}
-
-    <p>
-      <strong>リスナー:</strong> {{ a.stats.listeners|intcomma }} /
-      <strong>再生回数:</strong> {{ a.stats.playcount|intcomma }}
-    </p>
-
-    <h3>タグ</h3>
-    <ul>
-      {% for tag in a.tags.tag %}
-        <li>{{ tag.name }}</li>
-      {% empty %}
-        <li>タグ情報なし</li>
-      {% endfor %}
-    </ul>
-
-    <h3>バイオグラフィ</h3>
-    <div class="bio">
-      {{ a.bio.summary|safe }} {# Last.fm からの HTML をそのまま表示。不要なら safe を外してテキスト化 #}
-    </div>
-
-    <p><a href="{{ a.url }}" target="_blank">Last.fm でさらに見る →</a></p>
-  {% else %}
-    <p>アーティスト情報が取得できませんでした。</p>
-  {% endif %}
+{% if a %}
+  <h2>{{ a.name }}</h2>
+  <p>
+    Listeners: {{ a.stats.listeners|intcomma }} ·
+    Plays: {{ a.stats.playcount|intcomma }}
+  </p>
+  <h3>Top Tags</h3>
+  <ul>
+    {% for tag in a.tags.tag %}
+      <li>{{ tag.name }}</li>
+    {% empty %}
+      <li>No tags.</li>
+    {% endfor %}
+  </ul>
+  <h3>Biography</h3>
+  <div class="bio">{{ a.bio.summary|safe }}</div>
+  <p><a href="{{ a.url }}" target="_blank">View on Last.fm →</a></p>
+{% else %}
+  <p>Failed to retrieve artist data.</p>
+{% endif %}
 {% endblock %}

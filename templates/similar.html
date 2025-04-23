@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% load static humanize %}
 {% block content %}
-<h2>{{ base_track }} に似ている曲</h2>
+<h2>Tracks similar to “{{ base_track }}”</h2>
 <ul>
   {% for t in tracks %}
-    <li><a href="{{ t.url }}" target="_blank">{{ t.name }} — {{ t.artist.name }}</a></li>
+    <li>
+      <a href="{{ t.url }}" target="_blank">{{ t.name }}</a> — {{ t.artist.name }}
+    </li>
   {% empty %}
-    <li>データが見つかりませんでした。</li>
+    <li>No similar tracks available.</li>
   {% endfor %}
 </ul>
 {% endblock %}

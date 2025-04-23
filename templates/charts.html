@@ -1,20 +1,16 @@
 {% extends "base.html" %}
-{% load humanize %}  
+{% load humanize %}
 {% block content %}
-  <h2>Last.fm グローバルトップトラック (上位 {{ tracks|length }} 曲)</h2>
-
-  <ol>
-    {% for t in tracks %}
-      <li>
-        <a href="{{ t.url }}" target="_blank">
-          {{ t.name }} — {{ t.artist.name }}
-        </a>
-        <span class="meta">
-          (再生: {{ t.playcount|intcomma }})
-        </span>
-      </li>
-    {% empty %}
-      <li>チャート情報が取得できませんでした。</li>
-    {% endfor %}
-  </ol>
+<h2>Current Global Top Tracks</h2>
+<ol>
+  {% for t in tracks %}
+    <li>
+      <a href="{{ t.url }}" target="_blank">{{ t.name }}</a>
+      — {{ t.artist.name }}
+      <span class="meta">(plays: {{ t.playcount|intcomma }})</span>
+    </li>
+  {% empty %}
+    <li>Chart data is unavailable at the moment.</li>
+  {% endfor %}
+</ol>
 {% endblock %}

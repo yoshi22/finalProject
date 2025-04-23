@@ -1,59 +1,80 @@
-import requests, logging
-from django.core.management.base import BaseCommand
+import logging
+from typing import Any
+
+import requests
 from django.conf import settings
+from django.core.management.base import BaseCommand
+
 from music.models import Artist, Track
 
 API = settings.LASTFM_ROOT
 KEY = settings.LASTFM_API_KEY
 HEAD = {"User-Agent": settings.LASTFM_USER_AGENT}
 
-def call_lastfm(params):
+
+def lfm(params: dict[str, Any]) -> dict | None:
+    """Call Last.fm API and return JSON (or None on error)."""
     params |= {"api_key": KEY, "format": "json"}
-    r = requests.get(API, params=params, headers=HEAD, timeout=5)
-    data = r.json()
-    if "error" in data:
-        raise RuntimeError(data["message"])
-    return data
+    try:
+        res = requests.get(API, params=params, headers=HEAD, timeout=5)
+        data = res.json()
+        if "error" in data:
+            raise RuntimeError(data["message"])
+        return data
+    except Exception as exc:
+        logging.warning("Last.fm API error: %s", exc)
+        return None
+
 
 class Command(BaseCommand):
-    help = "Fetch artist info & similar tracks, save to DB"
+    """Import artists / tracks from Last.fm into SQLite."""
+
+    help = "Import chart or similar-track data from Last.fm"
 
     def add_arguments(self, parser):
-        parser.add_argument("--artist", required=True, help="Artist name")
+        parser.add_argument("--artist", help="Seed artist name")
         parser.add_argument("--track", help="Seed track name (optional)")
         parser.add_argument("--chart", action="store_true", help="Import global top chart")
 
+    # ------------------------------------------------------------------
     def handle(self, *args, **opts):
         if opts["chart"]:
             self.import_chart()
             return
+        if not opts["artist"]:
+            self.stderr.write("Use --artist or --chart.")
+            return
+        self.import_artist(opts["artist"], opts.get("track"))
 
-        artist_name = opts["artist"]
-        self.stdout.write(f"Fetching artist {artist_name}")
-        a_data = call_lastfm({"method": "artist.getInfo", "artist": artist_name, "lang": "ja"})["artist"]
-
+    # ------------------------------------------------------------------
+    def import_artist(self, artist_name: str, seed_track: str | None):
+        self.stdout.write(f"Fetching artist info: {artist_name}")
+        a_data = lfm({"method": "artist.getInfo", "artist": artist_name})
+        if not a_data:
+            self.stderr.write("Failed to fetch artist.")
+            return
+        a_json = a_data["artist"]
         artist, _ = Artist.objects.update_or_create(
-            name=a_data["name"],
+            name=a_json["name"],
             defaults={
-                "mbid": a_data.get("mbid") or None,
-                "url": a_data["url"],
-                "listeners": a_data["stats"]["listeners"],
-                "playcount": a_data["stats"]["playcount"],
-                "summary": a_data["bio"]["summary"],
+                "mbid": a_json.get("mbid") or None,
+                "url": a_json["url"],
+                "listeners": a_json["stats"]["listeners"],
+                "playcount": a_json["stats"]["playcount"],
+                "summary": a_json["bio"]["summary"],
             },
         )
-
-        # 類似トラック取得（seed: track param or artist top track）
-        seed_track = opts.get("track") or a_data.get("name")    # fallback
-        if seed_track:
-            t_data = call_lastfm({
+        source_track = seed_track or a_json["name"]
+        s_data = lfm(
+            {
                 "method": "track.getSimilar",
                 "artist": artist_name,
-                "track": seed_track,
+                "track": source_track,
                 "limit": 20,
-            })["similartracks"]["track"]
-
-            for t in t_data:
+            }
+        )
+        if s_data:
+            for t in s_data["similartracks"]["track"]:
                 Track.objects.update_or_create(
                     title=t["name"],
                     artist=Artist.objects.get_or_create(name=t["artist"]["name"])[0],
@@ -62,21 +83,25 @@ class Command(BaseCommand):
                         "match": float(t["match"]),
                     },
                 )
-        self.stdout.write(self.style.SUCCESS("Import finished."))
+        self.stdout.write(self.style.SUCCESS("Import completed."))
 
+    # ------------------------------------------------------------------
     def import_chart(self):
-        self.stdout.write("Fetching global top chart")
-        top = call_lastfm({"method": "chart.getTopTracks", "limit": 50})["tracks"]["track"]
-        for t in top:
+        self.stdout.write("Fetching global chart …")
+        data = lfm({"method": "chart.getTopTracks", "limit": 50})
+        if not data:
+            self.stderr.write("Failed to fetch chart.")
+            return
+        for t in data["tracks"]["track"]:
             artist, _ = Artist.objects.get_or_create(
-                name=t["artist"]["name"],
-                defaults={"url": t["artist"]["url"]},
+                name=t["artist"]["name"], defaults={"url": t["artist"]["url"]}
             )
             Track.objects.update_or_create(
-                title=t["name"], artist=artist,
+                title=t["name"],
+                artist=artist,
                 defaults={
                     "url": t["url"],
                     "playcount": int(t["playcount"]),
                 },
             )
-        self.stdout.write(self.style.SUCCESS("Chart import finished."))
+        self.stdout.write(self.style.SUCCESS("Chart import completed."))

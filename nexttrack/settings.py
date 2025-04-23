@@ -1,47 +1,38 @@
 """
-nexttrack/settings.py  ―  Django 5.2 sample settings
------------------------------------------------------
-
-環境変数（.env）を優先して読み込み、
-デフォルト値でフォールバックする構成です。
+Django settings for nexttrack (English-only version).
 """
 
 from pathlib import Path
 import os
-from dotenv import load_dotenv   # python-dotenv をインストール済み前提
+from dotenv import load_dotenv
 
-# --------------------------------------------------
-# ベースディレクトリ
-# --------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# .env 読み込み (.env は BASE_DIR 直下想定)
 load_dotenv(BASE_DIR / ".env")
 
-# --------------------------------------------------
-# セキュリティ
-# --------------------------------------------------
-SECRET_KEY = os.getenv("DJANGO_SECRET", "!!!_DEVELOPMENT_ONLY_SECRET_!!!")
+# -------------------------------------------------------------------
+# Security
+# -------------------------------------------------------------------
+SECRET_KEY = os.getenv("DJANGO_SECRET", "CHANGE_ME_FOR_PRODUCTION")
 DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if not DEBUG else []
 
-# --------------------------------------------------
-# アプリケーション
-# --------------------------------------------------
+# -------------------------------------------------------------------
+# Installed apps
+# -------------------------------------------------------------------
 INSTALLED_APPS = [
-    # 標準
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # サードパーティがあればここに追記（例: rest_framework）
-    # 自作アプリ
-    "django.contrib.humanize",  # 人間向けのフォーマッタ
+    "django.contrib.humanize",
     "music",
 ]
 
+# -------------------------------------------------------------------
+# Middleware / URL routing
+# -------------------------------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -54,15 +45,16 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "nexttrack.urls"
 
-# --------------------------------------------------
-# テンプレート
-# --------------------------------------------------
+# -------------------------------------------------------------------
+# Templates
+# -------------------------------------------------------------------
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],   # プロジェクト共通テンプレート
-        "APP_DIRS": True,                   # app/templates も自動読込
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
         "OPTIONS": {
+            "builtins": ["django.templatetags.static"],
             "context_processors": [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
@@ -73,65 +65,39 @@ TEMPLATES = [
     },
 ]
 
-# --------------------------------------------------
-# WSGI / ASGI
-# --------------------------------------------------
 WSGI_APPLICATION = "nexttrack.wsgi.application"
-# ASGI_APPLICATION = "nexttrack.asgi.application"  # async を使う場合はこちら
 
-# --------------------------------------------------
-# データベース（開発は SQLite、必要なら .env で上書き）
-# --------------------------------------------------
+# -------------------------------------------------------------------
+# Database
+# -------------------------------------------------------------------
 DATABASES = {
     "default": {
         "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
         "NAME": os.getenv("DB_NAME", BASE_DIR / "db.sqlite3"),
-        "USER": os.getenv("DB_USER", ""),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", ""),
-        "PORT": os.getenv("DB_PORT", ""),
     }
 }
 
-# --------------------------------------------------
-# パスワード検証
-# --------------------------------------------------
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
-]
-
-# --------------------------------------------------
-# 国際化
-# --------------------------------------------------
-LANGUAGE_CODE = "ja"
+# -------------------------------------------------------------------
+# Internationalization
+# -------------------------------------------------------------------
+LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Tokyo"
 USE_I18N = True
 USE_TZ = True
 
-# --------------------------------------------------
-# 静的 / メディアファイル
-# --------------------------------------------------
+# -------------------------------------------------------------------
+# Static & Media
+# -------------------------------------------------------------------
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATIC_ROOT = BASE_DIR / "staticfiles"      # collectstatic 先（本番用）
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"             # ユーザアップロード
+MEDIA_ROOT = BASE_DIR / "media"
 
-# --------------------------------------------------
-# キャッシュ（開発はローカルメモリ、本番は memcached / redis 推奨）
-# --------------------------------------------------
+# -------------------------------------------------------------------
+# Caching (local memory for development)
+# -------------------------------------------------------------------
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -139,39 +105,21 @@ CACHES = {
     }
 }
 
-# --------------------------------------------------
-# ロギング（最低限：コンソール出力）
-# --------------------------------------------------
+# -------------------------------------------------------------------
+# Logging
+# -------------------------------------------------------------------
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
-    },
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "INFO")},
 }
 
-# --------------------------------------------------
-# Last.fm API 連携用カスタム設定
-# --------------------------------------------------
+# -------------------------------------------------------------------
+# Last.fm settings
+# -------------------------------------------------------------------
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY", "")
-LASTFM_ROOT    = "http://ws.audioscrobbler.com/2.0/"
-LASTFM_USER_AGENT = "NextTrackStudent/1.0"   # 共通ヘッダで送ると親切
+LASTFM_ROOT = "http://ws.audioscrobbler.com/2.0/"
+LASTFM_USER_AGENT = "NextTrackStudent/1.0"
 
-# --------------------------------------------------
-# 追加セキュリティ（HTTPS を強制する場合）
-# --------------------------------------------------
-if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-
-# --------------------------------------------------
-# デフォルトの AutoField 型
-# --------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
