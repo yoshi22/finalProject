@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8">
   <title>NextTrack</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">  {# ★追加 #}
   <link rel="stylesheet" href="{% static 'style.css' %}">
 </head>
 <body>
@@ -16,9 +17,7 @@
       <a href="{% url 'playlist_list' %}">My Playlists</a>
       <form action="{% url 'logout' %}" method="post" style="display:inline">
         {% csrf_token %}
-        <button style="background:none;border:none;padding:0;color:var(--primary);cursor:pointer">
-          Logout
-        </button>
+        <button>Logout</button>
       </form>
     {% else %}
       <a href="{% url 'login' %}">Login</a>
