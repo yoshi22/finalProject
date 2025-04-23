@@ -1,8 +1,10 @@
-{% extends "base.html" %}{% block content %}
-<form action="{% url 'similar' %}" method="get">
-  <label>Artist:<input name="artist" required></label>
-  <label>Track:<input name="track" required></label>
-  <button>Find Similar</button>
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<h2>曲名検索</h2>
+<form action="{% url 'search' %}" method="get">
+  <input name="q" placeholder="曲名やアーティスト名" size="40" required>
+  <button>Search</button>
 </form>
-<p><a href="{% url 'charts' %}">今のトップチャートを見る</a></p>
+<p><a href="{% url 'charts' %}">📈 グローバルトップチャートを見る</a></p>
 {% endblock %}

@@ -1,4 +1,6 @@
-{% extends "base.html" %}{% block content %}
+{% extends "base.html" %}
+{% load static humanize %}
+{% block content %}
 <h2>{{ base_track }} に似ている曲</h2>
 <ul>
   {% for t in tracks %}

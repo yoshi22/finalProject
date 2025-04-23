@@ -1,58 +1,58 @@
 import requests, logging
 from django.conf import settings
 from django.shortcuts import render, redirect
-from django.core.cache import cache  # ★簡易キャッシュ
-from music.models import Track
 
+API_KEY = settings.LASTFM_API_KEY
+API_ROOT = settings.LASTFM_ROOT
+HEADERS  = {"User-Agent": settings.LASTFM_USER_AGENT}
 
-API = settings.LASTFM_ROOT
-KEY = settings.LASTFM_API_KEY
-HEAD = {"User-Agent": "NextTrackStudent/1.0"}  # 推奨ヘッダ
-
-def _api(params, ttl=3600):
-    """共通 GET + キャッシュ"""
-    params |= {"api_key": KEY, "format": "json"}
-    cache_key = f"lfm:{str(sorted(params.items()))}"
-    if (data := cache.get(cache_key)):
-        return data
+def lfm(params):
+    """汎用 Last.fm GET（簡易 5 秒タイムアウト）"""
+    params |= {"api_key": API_KEY, "format": "json"}
     try:
-        r = requests.get(API, params=params, headers=HEAD, timeout=5)
+        r = requests.get(API_ROOT, params=params, headers=HEADERS, timeout=5)
         data = r.json()
-        if "error" in data: raise ValueError(data["message"])
-        cache.set(cache_key, data, ttl)
+        if "error" in data:
+            raise RuntimeError(data["message"])
         return data
     except Exception as e:
         logging.warning("Last.fm API error: %s", e)
         return None
 
-# ① ホーム
+# --- View 関数 -------------------------------------------------------------
+
 def home(request):
+    """検索フォームのみ"""
     return render(request, "home.html")
 
-# ② 類似曲
+def track_search(request):
+    """曲名検索 → 候補表示"""
+    query = request.GET.get("q")
+    if not query:
+        return redirect("home")
+    data = lfm({"method": "track.search", "track": query, "limit": 20})
+    tracks = data["results"]["trackmatches"]["track"] if data else []
+    return render(request, "search_results.html",
+                  {"query": query, "tracks": tracks})
+
 def similar(request):
+    """曲名 + アーティストを受け取り類似曲を API から取得"""
     artist = request.GET.get("artist")
-    track = request.GET.get("track")
+    track  = request.GET.get("track")
     if not (artist and track):
         return redirect("home")
-
-    data = _api({"method":"track.getSimilar",
-                 "artist":artist, "track":track, "limit":10})
-    tracks = (data or {}).get("similartracks", {}).get("track", [])
+    data = lfm({"method": "track.getSimilar",
+                "artist": artist, "track": track, "limit": 15})
+    tracks = data["similartracks"]["track"] if data else []
     return render(request, "similar.html",
                   {"base_track": f"{artist} – {track}", "tracks": tracks})
 
-# ③ アーティスト詳細
 def artist_detail(request, name):
-    data = _api({"method":"artist.getInfo", "artist":name, "lang":"ja"}, ttl=86400)
-    return render(request, "artist.html", {"a": data and data["artist"]})
+    data = lfm({"method": "artist.getInfo", "artist": name, "lang": "ja"})
+    return render(request, "artist.html",
+                  {"a": data and data["artist"], "name": name})
 
-# ④ トップチャート
-def top_tracks(request):
-    data = _api({"method":"chart.getTopTracks", "limit":20}, ttl=1800)
-    tracks = (data or {}).get("tracks", {}).get("track", [])
-    return render(request, "charts.html", {"tracks": tracks})
-
-def charts_from_db(request):
-    tracks = Track.objects.filter(playcount__gt=0).select_related("artist")[:20]
+def live_chart(request):
+    data = lfm({"method": "chart.getTopTracks", "limit": 25})
+    tracks = data["tracks"]["track"] if data else []
     return render(request, "charts.html", {"tracks": tracks})
