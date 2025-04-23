@@ -6,7 +6,6 @@
       <h3>{{ t.name }}</h3>
       <p class="meta">{{ t.artist }}</p>
       <a href="{% url 'similar' %}?artist={{ t.artist }}&track={{ t.name }}">Similar</a> ·
-      <a href="{% url 'recommend' %}?artist={{ t.artist }}&track={{ t.name }}">Deep-Cut</a> ·
       <a href="{% url 'track_detail' t.artist t.name %}">Play</a>
       {% if request.user.is_authenticated %}
         <form action="{% url 'playlist_add' 1 %}"  method="get" style="margin-top:4px">

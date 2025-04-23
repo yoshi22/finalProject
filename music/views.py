@@ -1,5 +1,4 @@
 import logging
-import math
 from typing import Any
 
 import requests
@@ -18,7 +17,6 @@ HEADERS = {"User-Agent": settings.LASTFM_USER_AGENT}
 
 
 def call_lastfm(params: dict[str, Any]) -> dict | None:
-    """Generic Last.fm GET with basic error handling."""
     params |= {"api_key": API_KEY, "format": "json"}
     try:
         res = requests.get(API_ROOT, params=params, headers=HEADERS, timeout=5)
@@ -26,46 +24,39 @@ def call_lastfm(params: dict[str, Any]) -> dict | None:
         if "error" in data:
             raise RuntimeError(data["message"])
         return data
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         logging.warning("Last.fm API error: %s", exc)
         return None
 
 
 # ------------------------------------------------------------------ #
-#  YouTube helper (search + first video)
+#  iTunes Search helper (30-second AAC preview)
 # ------------------------------------------------------------------ #
-YT_KEY = settings.YOUTUBE_API_KEY
-YT_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
+ITUNES_URL = "https://itunes.apple.com/search"
 
 
-def search_youtube(query: str) -> str | None:
-    if not YT_KEY:
-        return None
-    params = {
-        "part": "id",
-        "type": "video",
-        "maxResults": 1,
-        "q": query,
-        "key": YT_KEY,
-    }
+def itunes_preview(term: str) -> str | None:
+    params = {"term": term, "entity": "song", "limit": 1}
     try:
-        res = requests.get(YT_SEARCH_URL, params=params, timeout=5)
-        data = res.json()
-        items = data.get("items")
-        if items:
-            return items[0]["id"]["videoId"]
+        r = requests.get(ITUNES_URL, params=params, timeout=5)
+        data = r.json()
+        if data.get("resultCount"):
+            return data["results"][0]["previewUrl"]
     except Exception as exc:
-        logging.warning("YouTube API error: %s", exc)
+        logging.warning("iTunes API error: %s", exc)
     return None
 
 
 # ------------------------------------------------------------------ #
-#  Basic search / similar / chart
+#  Top page
 # ------------------------------------------------------------------ #
 def home(request):
     return render(request, "home.html")
 
 
+# ------------------------------------------------------------------ #
+#  Search, similar, chart
+# ------------------------------------------------------------------ #
 def track_search(request):
     q = request.GET.get("q")
     if not q:
@@ -76,7 +67,8 @@ def track_search(request):
 
 
 def similar(request):
-    art, title = request.GET.get("artist"), request.GET.get("track")
+    art = request.GET.get("artist")
+    title = request.GET.get("track")
     if not (art and title):
         return redirect("home")
     data = call_lastfm(
@@ -88,19 +80,19 @@ def similar(request):
     )
 
 
-def artist_detail(request, name):
-    data = call_lastfm({"method": "artist.getInfo", "artist": name, "lang": "en"})
-    return render(request, "artist.html", {"a": data and data["artist"], "name": name})
-
-
 def live_chart(request):
     data = call_lastfm({"method": "chart.getTopTracks", "limit": 25})
     tracks = data["tracks"]["track"] if data else []
     return render(request, "charts.html", {"tracks": tracks})
 
 
+def artist_detail(request, name):
+    data = call_lastfm({"method": "artist.getInfo", "artist": name, "lang": "en"})
+    return render(request, "artist.html", {"a": data and data["artist"], "name": name})
+
+
 # ------------------------------------------------------------------ #
-#  Track detail + YouTube embed
+#  Track detail (Last.fm info + iTunes preview)
 # ------------------------------------------------------------------ #
 def track_detail(request, artist: str, title: str):
     info = call_lastfm({"method": "track.getInfo", "artist": artist, "track": title})
@@ -109,7 +101,7 @@ def track_detail(request, artist: str, title: str):
 
     t = info["track"]
     query = f"{artist} {title}"
-    video_id = search_youtube(query)
+    preview = itunes_preview(query)
 
     context = {
         "title": t["name"],
@@ -117,8 +109,7 @@ def track_detail(request, artist: str, title: str):
         "url": t["url"],
         "playcount": int(t.get("playcount", 0)),
         "summary": t.get("wiki", {}).get("summary", ""),
-        "video_id": video_id,
-        "query": query,
+        "preview": preview,
     }
     return render(request, "track.html", context)
 
