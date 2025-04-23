@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block content %}
+<form action="{% url 'similar' %}" method="get">
+  <label>Artist:<input name="artist" required></label>
+  <label>Track:<input name="track" required></label>
+  <button>Find Similar</button>
+</form>
+<p><a href="{% url 'charts' %}">今のトップチャートを見る</a></p>
+{% endblock %}

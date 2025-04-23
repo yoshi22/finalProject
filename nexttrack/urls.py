@@ -15,13 +15,9 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
-from recommender import api as rec_api   # 追加★
+from django.urls import path, include
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-
-    # --- Recommender API -------------------------------
-    path("api/recommend/", rec_api.RecommendView.as_view(), name="recommend"),
-    path("api/similar/<str:track_id>/", rec_api.SimilarView.as_view(), name="similar"),
+    path('admin/', admin.site.urls),
+    path('', include('music.urls')),
 ]

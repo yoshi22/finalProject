@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block content %}
+<h2>{{ base_track }} に似ている曲</h2>
+<ul>
+  {% for t in tracks %}
+    <li><a href="{{ t.url }}" target="_blank">{{ t.name }} — {{ t.artist.name }}</a></li>
+  {% empty %}
+    <li>データが見つかりませんでした。</li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% load static %}
+{% load humanize %}  
+
+<!doctype html><html lang="ja">
+<head><meta charset="utf-8"><title>NextTrack</title>
+<link rel="stylesheet" href="{% static 'style.css' %}"></head>
+<body>
+  <h1><a href="{% url 'home' %}">NextTrack 🎵</a></h1>
+  {% block content %}{% endblock %}
+  <footer>Powered by <a href="https://www.last.fm/api">Last.fm</a></footer>
+</body></html>
