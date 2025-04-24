@@ -37,6 +37,13 @@ nav a,nav button{color:var(--muted);font-weight:500;font-size:.95rem}
 nav a:hover,nav button:hover{color:var(--primary)}
 nav button{background:none;border:none;cursor:pointer;padding:0}
 
+.back-btn{
+  display:inline-block;margin-bottom:1rem;font-size:0.9rem;
+  color:var(--muted);
+}
+.back-btn:hover{text-decoration:underline}
+
+
 /* ------------------------------ */
 /*  Search Bar                     */
 /* ------------------------------ */

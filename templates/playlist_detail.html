@@ -1,4 +1,6 @@
 {% extends "base.html" %}{% block content %}
+<a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
+
 <h2>
   {{ playlist.name }}
   <form method="post" style="display:inline">{% csrf_token %}

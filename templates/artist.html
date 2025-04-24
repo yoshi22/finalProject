@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load humanize %}
 {% block content %}
+<a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
+
 {% if a %}
   <h2>{{ a.name }}</h2>
   <p class="meta">Listeners: {{ a.stats.listeners|intcomma }} · Plays: {{ a.stats.playcount|intcomma }}</p>
