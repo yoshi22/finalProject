@@ -1,5 +1,11 @@
 {% extends "base.html" %}{% block content %}
-<a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
+<a href="{% url 'home' %}"
+   class="back-btn"
+   onclick="event.preventDefault();
+            if (history.length > 1) { history.back(); }
+            else { window.location = this.getAttribute('href'); }">
+  ← Back
+</a>
 
 <h2>
   {{ playlist.name }}
