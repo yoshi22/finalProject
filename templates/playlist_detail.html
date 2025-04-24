@@ -1,11 +1,8 @@
 {% extends "base.html" %}{% block content %}
-<a href="{% url 'home' %}"
-   class="back-btn"
+<a href="{% url 'home' %}" class="back-btn"
    onclick="event.preventDefault();
             if (history.length > 1) { history.back(); }
-            else { window.location = this.getAttribute('href'); }">
-  ← Back
-</a>
+            else { window.location = this.getAttribute('href'); }">← Back</a>
 
 <h2>
   {{ playlist.name }}
@@ -17,15 +14,13 @@
 <ul id="track-list">
 {% for item in tracks %}
   <li data-id="{{ item.track.id }}">
-    <!-- タイトル & 削除 -->
     {{ item.track.title }} — {{ item.track.artist.name }}
-    <form method="post" style="display:inline">
-      {% csrf_token %}
+    <form method="post" style="display:inline">{% csrf_token %}
       <button name="remove_track" value="{{ item.track.id }}" style="font-size:0.8rem">×</button>
     </form>
-    · <a href="{% url 'track_detail' item.track.artist.name item.track.title %}">Info</a>
+    ·
+    <a href="{% url 'track_detail' item.track.artist.name|urlencode:"" item.track.title|urlencode:"" %}">Info</a>
 
-    <!-- 30-sec preview -->
     {% if item.track.preview_url %}
       <audio controls style="vertical-align:middle;width:160px;height:24px;margin-left:8px">
         <source src="{{ item.track.preview_url }}" type="audio/mpeg">
@@ -42,14 +37,15 @@
 <button id="save-order" style="margin-top:1rem">Save order</button>
 
 <script>
-/* drag-and-drop順序保存スクリプト (前回と同じ) */
 const list=document.getElementById("track-list");let el;
 list.ondragstart=e=>{el=e.target};list.ondragover=e=>e.preventDefault();
 list.ondrop=e=>{if(e.target.tagName==="LI")list.insertBefore(el,e.target.nextSibling)};
 document.querySelectorAll("#track-list li").forEach(li=>li.draggable=true);
 document.getElementById("save-order").onclick=()=>{
   const order=[...list.children].map(li=>li.dataset.id);
-  fetch(location.href,{method:"POST",headers:{"X-CSRFToken":"{{ csrf_token }}"},body:new URLSearchParams({order:JSON.stringify(order)})})
+  fetch(location.href,{method:"POST",
+        headers:{"X-CSRFToken":"{{ csrf_token }}"},
+        body:new URLSearchParams({order:JSON.stringify(order)})})
     .then(()=>location.reload());
 };
 </script>

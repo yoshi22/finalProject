@@ -9,7 +9,8 @@
   <div class="card">
     <h3>{{ t.name }}</h3>
     <p class="meta">{{ t.artist.name }}</p>
-    <a href="{% url 'track_detail' t.artist.name t.name %}">Play</a>
+
+    <a href="{% url 'track_detail' t.artist.name|urlencode:"" t.name|urlencode:"" %}">Play</a>
   </div>
 {% empty %}
   <p>No deep-cut matches found.</p>
