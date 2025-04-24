@@ -111,6 +111,36 @@ def track_detail(request, artist: str, title: str):
     }
     return render(request, "track.html", ctx)
 
+# deep-cut（通好み）レコメンド  -------------------------------
+def deepcut(request):
+    art = request.GET.get("artist")
+    title = request.GET.get("track")
+    if not (art and title):
+        return redirect("home")
+
+    # 元曲の再生数
+    base = call_lastfm({"method": "track.getInfo", "artist": art, "track": title})
+    if not base:
+        return redirect("home")
+    base_play = int(base["track"].get("playcount", 1))
+
+    # 類似曲を取得
+    sim = call_lastfm({"method": "track.getSimilar",
+                       "artist": art, "track": title, "limit": 100})
+    candidates = sim["similartracks"]["track"] if sim else []
+
+    deep = [
+        t for t in candidates
+        if int(t.get("playcount", 0)) < 0.2 * base_play
+           and int(t.get("playcount", 0)) < 50_000
+    ][:15]
+
+    return render(
+        request,
+        "deepcut.html",
+        {"base_track": f"{art} – {title}", "tracks": deep},
+    )
+
 
 # ------------------------------------------------------------------ #
 # Sign-up
