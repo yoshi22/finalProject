@@ -1,16 +1,34 @@
 {% extends "base.html" %}
-{% load humanize %}
 {% block content %}
 <h2>Global Top Tracks</h2>
+
 <div class="grid">
-  {% for t in tracks %}
-    <div class="card">
-      <h3>{{ forloop.counter }}. {{ t.name }}</h3>
-      <p class="meta">{{ t.artist.name }} · Plays: {{ t.playcount|intcomma }}</p>
-      <a href="{{ t.url }}" target="_blank">Open on Last.fm</a>
-    </div>
-  {% empty %}
-    <p>Chart data unavailable.</p>
-  {% endfor %}
+{% for t in tracks %}
+  <div class="card">
+    <h3>{{ t.name }}</h3>
+    <p class="meta">{{ t.artist.name }}</p>
+
+    <a href="{% url 'track_detail' t.artist.name t.name %}">Play</a>
+
+    {% if request.user.is_authenticated %}
+      <!-- ★ 追加: プレイリスト選択フォーム ---------------------------- -->
+      <form action="{% url 'playlist_add' %}" method="post" style="margin-top:6px">
+        {% csrf_token %}
+        <input type="hidden" name="artist" value="{{ t.artist.name }}">
+        <input type="hidden" name="track"  value="{{ t.name }}">
+        <select name="playlist"
+                onchange="this.nextElementSibling.style.display=this.value=='__new__'?'inline':'none'">
+          {% for pl in request.user.playlists.all %}
+            <option value="{{ pl.id }}">{{ pl.name }}</option>
+          {% endfor %}
+          <option value="__new__">＋ New playlist…</option>
+        </select>
+        <input  name="new_name" style="display:none" placeholder="Playlist name">
+        <button>Add</button>
+      </form>
+      <!-- ------------------------------------------------------------ -->
+    {% endif %}
+  </div>
+{% endfor %}
 </div>
 {% endblock %}

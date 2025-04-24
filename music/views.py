@@ -31,6 +31,15 @@ def call_lastfm(params: dict[str, Any]) -> dict | None:
         logging.warning("Last.fm API error: %s", exc)
         return None
 
+def ensure_preview(track: Track):
+    """Track に preview_url が無ければ iTunes から取得して保存"""
+    if track.preview_url:
+        return
+    url = itunes_preview(f"{track.artist.name} {track.title}")
+    if url:
+        track.preview_url = url
+        track.save(update_fields=["preview_url"])
+
 
 # ------------------------------------------------------------------ #
 # iTunes 30-sec preview helper
@@ -137,33 +146,48 @@ def playlist_list(request):
 
 
 @login_required
-def playlist_detail(request, pk):
+def playlist_detail(request, pk: int):
+    """表示 + 名前変更 + 曲削除 + 並べ替え + 各曲の preview 確保"""
     pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
 
-    # --- 名前変更 ---
+    # ---------- プレイリスト名変更 ----------
     if "rename" in request.POST:
         form = PlaylistRenameForm(request.POST, instance=pl)
         if form.is_valid():
             form.save()
             return redirect("playlist_detail", pk=pk)
 
-    # --- 曲削除 ---
+    # ---------- 曲削除 ----------
     if "remove_track" in request.POST:
-        PlaylistTrack.objects.filter(playlist=pl, track_id=request.POST["remove_track"]).delete()
+        PlaylistTrack.objects.filter(
+            playlist=pl, track_id=request.POST["remove_track"]
+        ).delete()
 
-    # --- 曲順更新 (JSON order=["3","1","2"]) ---
+    # ---------- 曲順並べ替え ----------
     if "order" in request.POST:
         try:
             order = json.loads(request.POST["order"])
             for idx, track_id in enumerate(order):
-                PlaylistTrack.objects.filter(playlist=pl, track_id=track_id).update(position=idx)
+                PlaylistTrack.objects.filter(
+                    playlist=pl, track_id=track_id
+                ).update(position=idx)
         except Exception:
             return HttpResponseBadRequest("Invalid order payload")
 
+    # 最新状態を取得
     pl.refresh_from_db()
-    tracks = pl.items.select_related("track__artist")
-    rename_form = PlaylistRenameForm(instance=pl)
-    return render(request, "playlist_detail.html", {"playlist": pl, "tracks": tracks, "rename_form": rename_form})
+    items = pl.items.select_related("track__artist")
+
+    # ---------- 30-sec preview を確実に用意 ----------
+    for item in items:
+        ensure_preview(item.track)
+
+    context = {
+        "playlist": pl,
+        "tracks": items,
+        "rename_form": PlaylistRenameForm(instance=pl),
+    }
+    return render(request, "playlist_detail.html", context)
 
 
 @login_required
@@ -189,6 +213,7 @@ def add_to_playlist(request):
     art, _ = Artist.objects.get_or_create(name=artist)
     track, _ = Track.objects.get_or_create(title=title, artist=art)
     PlaylistTrack.objects.get_or_create(playlist=pl, track=track, position=pl.items.count())
+    ensure_preview(track)
     return redirect("playlist_detail", pk=pl.pk)
 
 

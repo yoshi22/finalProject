@@ -25,6 +25,7 @@ class Track(models.Model):
     playcount = models.PositiveIntegerField(default=0)
     match = models.FloatField(null=True, blank=True)
     fetched_at = models.DateTimeField(auto_now=True)
+    preview_url = models.URLField(blank=True)  
 
     class Meta:
         unique_together = ("title", "artist")

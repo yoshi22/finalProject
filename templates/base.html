@@ -8,19 +8,11 @@
   <!-- ------------ CSS -------------- -->
   <link rel="stylesheet" href="{% static 'style.css' %}">
 
-  <!-- ------------ favicon ----------- -->
-  <link rel="icon" type="image/svg+xml"
-        href="{% static 'img/nexttrack-icon.svg' %}">
-  <link rel="mask-icon"
-        href="{% static 'img/nexttrack-icon.svg' %}" color="#E50914">
-  <meta name="theme-color" content="#E50914">
+
 </head>
 
 <body>
 <header class="site-header" style="display:flex;align-items:center;gap:.35rem">
-  <!-- ロゴ画像（高さ 28px） -->
-  <img src="{% static 'img/nexttrack-logo.svg' %}"
-       alt="NextTrack logo" style="height:28px">
 
   <!-- サービス名リンク（従来どおり） -->
   <a href="{% url 'home' %}" class="logo">NextTrack</a>
