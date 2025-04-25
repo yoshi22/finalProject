@@ -1,0 +1,1 @@
+web: gunicorn nexttrack.wsgi --log-file -
