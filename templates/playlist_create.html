@@ -1,8 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<h2>Create Playlist</h2>
-<form method="post">{% csrf_token %}
-  <input name="name" placeholder="Playlist name" required>
-  <button>Create</button>
-</form>
-{% endblock %}
