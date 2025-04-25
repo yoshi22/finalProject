@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if error %}
+  <p style="color:red">{{ error }}</p>
+  <a href="{% url 'home' %}">← Back</a>
+{% else %}
+  <a href="{% url 'home' %}"
+     class="back-btn"
+     onclick="event.preventDefault();
+              if (history.length > 1) { history.back(); }
+              else { window.location = this.getAttribute('href'); }">
+    ← Back
+  </a>
+
+  <h2>
+    {{ track.name }}
+    <small style="font-size:0.8rem;color:var(--muted)">
+      by {{ track.artist.name }}
+    </small>
+  </h2>
+
+  {% if embed_url %}
+    <iframe src="{{ embed_url }}"
+            width="100%" height="80" allow="autoplay; clipboard-write; encrypted-media"
+            style="border:none;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.12);">
+    </iframe>
+  {% endif %}
+
+  <p style="margin-top:1rem">
+    <strong>Playcount:</strong> {{ track.playcount|default:"—" }}<br>
+    <strong>Listeners:</strong> {{ track.listeners|default:"—" }}
+  </p>
+
+  {% if track.toptags.tag %}
+    <p>
+      <strong>Tags:</strong>
+      {% for tag in track.toptags.tag|slice:":10" %}
+        <span style="margin-right:4px;background:#eee;padding:2px 6px;border-radius:4px">
+          {{ tag.name }}
+        </span>
+      {% endfor %}
+    </p>
+  {% endif %}
+
+  {% if track.wiki.summary %}
+    <hr>
+    <div style="line-height:1.45">
+      {{ track.wiki.summary|safe }}
+    </div>
+  {% endif %}
+{% endif %}
+
+{% endblock %}
