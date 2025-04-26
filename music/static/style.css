@@ -26,7 +26,7 @@ body{
   background:var(--bg);
   color:var(--text);
   line-height:1.6;
-  padding-top:88px;   
+  padding-top:88px;     /* header height push-down */
 }
 a{color:var(--primary);text-decoration:none}
 a:hover{text-decoration:underline}
@@ -38,15 +38,41 @@ a:hover{text-decoration:underline}
 header{
   background:var(--card);
   border-bottom:1px solid var(--border);
-  padding:.3rem 1rem;
+  padding:.3rem 1rem;                       /* header vertical padding */
   display:flex;align-items:center;gap:1rem;
+  flex-wrap:wrap;                            /* allow wrapping on narrow screens */
   position:fixed;top:0;left:0;width:100%;z-index:1000;
 }
 .logo{font-size:1.4rem;font-weight:bold;color:var(--primary)}
-nav{margin-left:auto;display:flex;gap:1rem;flex-wrap:wrap}
+
+.hamburger{
+  display:none;background:none;border:none;
+  font-size:1.8rem;color:var(--muted);cursor:pointer;
+  margin-left:.5rem;margin-right:0;
+}
+.hamburger:focus{outline:none}
+
+nav{
+  margin-left:auto;display:flex;gap:1rem;flex-wrap:wrap
+}
 nav a,nav button{color:var(--muted);font-weight:500;font-size:.95rem}
 nav a:hover,nav button:hover{color:var(--primary)}
 nav button{background:none;border:none;cursor:pointer;padding:0}
+
+/* header-embedded search bar */
+header .search-bar{
+  flex:1 1 280px;                 /* grow / shrink with min width 280px */
+  display:flex;margin:0 0 .6rem;
+}
+header .search-bar input{
+  flex:1;padding:.6rem .8rem;border:1px solid var(--border);
+  border-radius:4px 0 0 4px;min-width:50px;
+}
+header .search-bar button{
+  padding:.6rem 1rem;border:1px solid var(--border);border-left:none;
+  background:var(--primary);color:#fff;border-radius:0 4px 4px 0;cursor:pointer
+}
+header .search-bar button:hover{opacity:.9}
 
 .back-btn{
   display:inline-block;margin-bottom:1rem;font-size:.9rem;
@@ -55,7 +81,8 @@ nav button{background:none;border:none;cursor:pointer;padding:0}
 .back-btn:hover{text-decoration:underline}
 
 /* ------------------------------ */
-/*  Search Bar                     */
+/*  Stand-alone Search Bar block   */
+/*  (e.g. on home page hero)       */
 /* ------------------------------ */
 .search-bar{display:flex;margin-block:1rem 2rem}
 .search-bar input{
@@ -82,7 +109,6 @@ nav button{background:none;border:none;cursor:pointer;padding:0}
 }
 .card h3{font-size:1.05rem}
 .card .meta{font-size:.85rem;color:var(--muted)}
-/* audio preview toggle */
 .card details{margin-bottom:.4rem}
 audio{width:100%;margin-top:.4rem}
 
@@ -97,42 +123,35 @@ h2{margin-block:1.5rem 1rem}
 /* ------------------------------ */
 footer{text-align:center;padding:2rem 0;font-size:.85rem;color:var(--muted)}
 
-/* ---------- Hamburger ---------- */
-.hamburger{                         /* --- add --- */
-  display:none;
-  background:none;
-  border:none;
-  font-size:1.8rem;
-  color:var(--muted);
-  cursor:pointer;
-  margin-left:3rem;
-  margin-right:0;
-}
-.hamburger:focus{outline:none}
-/* ---------- add end ---------- */
-
 /* ====================================================== */
 /*  Responsive tweaks                                      */
 /* ====================================================== */
 
-/* ≤768 px: stack nav items & make search-bar full width */
+/* ≤768 px ------------------------------------------------ */
 @media(max-width:768px){
   .hamburger{display:block}
 
   nav{flex-direction:column;align-items:flex-start;gap:.5rem;margin-left:0}
-  #main-nav{display:none; width:100%}
+  #main-nav{display:none;width:100%}
   #main-nav.open{display:flex}
-  
-  .search-bar{flex-direction:row}
-  .search-bar input,.search-bar button{border-radius:4px;border:1px solid var(--border)}
-  .search-bar button{border-left:1px solid var(--border)}
+
+  header .search-bar{
+    order:3;               /* push search to next row on mobile */
+    width:100%;margin-top:.6rem
+  }
+  header .search-bar input,
+  header .search-bar button{
+    border-radius:4px;border:1px solid var(--border)
+  }
+  header .search-bar button{border-left:1px solid var(--border)}
 }
 
-/* ≤480 px: single-column grid & tighter paddings */
+/* ≤480 px ------------------------------------------------ */
 @media(max-width:480px){
   .container{padding-block:1rem}
   .grid{grid-template-columns:1fr}
   header{flex-direction:column;align-items:flex-start;gap:.5rem}
   .logo{font-size:1.2rem}
   nav a,nav button{font-size:.9rem}
+  header .search-bar{margin-top:.4rem}
 }
