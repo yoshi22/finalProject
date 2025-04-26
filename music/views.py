@@ -10,6 +10,7 @@ from django.http import HttpResponseBadRequest
 
 from .forms import SignUpForm, PlaylistRenameForm, AddTrackForm
 from .models import Artist, Playlist, PlaylistTrack, Track
+from django.core.cache import cache   
 
 
 # ------------------------------------------------------------------
