@@ -72,12 +72,25 @@ def home(request):
 
 
 def track_search(request):
-    q = request.GET.get("q")
+    q = request.GET.get("q", "").strip()
     if not q:
         return redirect("home")
-    data = call_lastfm({"method": "track.search", "track": q, "limit": 20})
-    tracks = data["results"]["trackmatches"]["track"] if data else []
-    return render(request, "search_results.html", {"query": q, "tracks": tracks})
+
+    data = _lastfm("track.search", track=q, limit=20) or {}
+    tracks = data.get("results", {}).get("trackmatches", {}).get("track", [])
+    if isinstance(tracks, dict):
+        tracks = [tracks]
+
+    # ---------- NEW: fetch 30-sec preview URL ----------
+    for t in tracks:
+        preview = itunes_preview(f"{t.get('artist')} {t.get('name')}")
+        t["preview"] = preview  # None if not found
+
+    return render(request, "search_results.html", {
+        "query": q,
+        "tracks": tracks,
+    })
+
 
 
 def similar(request):

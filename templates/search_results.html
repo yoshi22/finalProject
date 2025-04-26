@@ -6,12 +6,23 @@
   <div class="card">
     <h3>{{ t.name }}</h3>
     <p class="meta">{{ t.artist }}</p>
+    {# ---------- NEW preview button ---------- #}
+
+    {% if t.preview %}
+      <details style="margin-bottom:6px">
+        <summary style="cursor:pointer">▶ 30-sec Preview</summary>
+        <audio controls style="width:100%;margin-top:4px">
+          <source src="{{ t.preview }}" type="audio/mpeg">
+          Your browser does not support the audio element.
+        </audio>
+      </details>
+    {% endif %}
 
     <a href="{% url 'similar' %}?artist={{ t.artist|urlencode:"" }}&track={{ t.name|urlencode:"" }}">Similar</a>
     ·
     <a href="{% url 'deepcut' %}?artist={{ t.artist|urlencode:"" }}&track={{ t.name|urlencode:"" }}">Deep-cut</a>
     ·
-    <a href="{% url 'track_detail' t.artist|urlencode:"" t.name|urlencode:"" %}">Play</a>
+    <a href="{% url 'track_detail' t.artist|urlencode:"" t.name|urlencode:"" %}">Detail</a>
 
     {% if request.user.is_authenticated %}
       <form action="{% url 'playlist_add' %}" method="post" style="margin-top:6px">
