@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block content %}
-<a href="/" class="back-btn">← Back</a>
+<a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
 <h2>Similar to {{ base_track }}</h2>
 
 <div class="grid">
