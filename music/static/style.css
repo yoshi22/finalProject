@@ -105,7 +105,7 @@ footer{text-align:center;padding:2rem 0;font-size:.85rem;color:var(--muted)}
   font-size:1.8rem;
   color:var(--muted);
   cursor:pointer;
-  margin-left:5rem;
+  margin-left:3rem;
   margin-right:0;
 }
 .hamburger:focus{outline:none}
