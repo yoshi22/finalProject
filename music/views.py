@@ -20,6 +20,8 @@ API_ROOT = settings.LASTFM_ROOT
 HEADERS = {"User-Agent": settings.LASTFM_USER_AGENT}
 
 
+
+
 def call_lastfm(params: dict[str, Any]) -> dict | None:
     """Wrapper for the Last.fm REST API, returns JSON or None on error."""
     params |= {"api_key": API_KEY, "format": "json"}
