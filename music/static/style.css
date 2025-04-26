@@ -61,12 +61,12 @@ nav button{background:none;border:none;cursor:pointer;padding:0}
 
 /* header-embedded search bar */
 header .search-bar{
-  flex:1 1 280px;                 /* grow / shrink with min width 280px */
+  flex:1 1 150px;                 /* grow / shrink with min width 150px */
   display:flex;margin:0 0 .6rem;
 }
 header .search-bar input{
   flex:1;padding:.6rem .8rem;border:1px solid var(--border);
-  border-radius:4px 0 0 4px;min-width:50px;
+  border-radius:4px 0 0 4px;min-width:40px;
 }
 header .search-bar button{
   padding:.6rem 1rem;border:1px solid var(--border);border-left:none;
