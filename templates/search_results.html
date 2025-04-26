@@ -1,4 +1,5 @@
 {% extends "base.html" %}{% block content %}
+<a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
 <h2>Results for “{{ query }}”</h2>
 
 <div class="grid">
