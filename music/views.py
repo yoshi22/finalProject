@@ -162,7 +162,7 @@ def track_detail(request, artist: str, title: str):
 
 
 # Deep-cut recommendation (for hardcore fans) -----------------------
-def deepcut(request):
+
 def deepcut(request):
     art = request.GET.get("artist")
     title = request.GET.get("track")
