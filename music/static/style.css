@@ -125,7 +125,7 @@ footer{text-align:center;padding:2rem 0;font-size:.85rem;color:var(--muted)}
   
   .search-bar{flex-direction:row}
   .search-bar input,.search-bar button{border-radius:4px;border:1px solid var(--border)}
-  .search-bar button{margin-top:.0;border-left:1px solid var(--border)}
+  .search-bar button{border-left:1px solid var(--border)}
 }
 
 /* ≤480 px: single-column grid & tighter paddings */
