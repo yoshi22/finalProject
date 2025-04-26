@@ -1,17 +1,24 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
-<a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
+<a href="/" class="back-btn">← Back</a>
+<h2>Similar to {{ base_track }}</h2>
 
-<h2>Tracks similar to “{{ base_track }}”</h2>
 <div class="grid">
   {% for t in tracks %}
     <div class="card">
       <h3>{{ t.name }}</h3>
       <p class="meta">{{ t.artist.name }}</p>
-      <a href="{{ t.url }}" target="_blank">Open on Last.fm</a>
+
+      {% if t.preview %}
+        <details>
+          <summary>▶ 30-sec Preview</summary>
+          <audio controls>
+            <source src="{{ t.preview }}" type="audio/mpeg">
+          </audio>
+        </details>
+      {% endif %}
     </div>
-  {% empty %}
-    <p>No similar tracks available.</p>
   {% endfor %}
 </div>
 {% endblock %}

@@ -1,37 +1,23 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
-<a href="{% url 'home' %}" class="back-btn"
-   onclick="event.preventDefault();
-            if (history.length > 1) { history.back(); }
-            else { window.location = this.getAttribute('href'); }">← Back</a>
-
 <h2>Global Top Tracks</h2>
 
 <div class="grid">
-{% for t in tracks %}
-  <div class="card">
-    <h3>{{ t.name }}</h3>
-    <p class="meta">{{ t.artist.name }}</p>
+  {% for t in tracks %}
+    <div class="card">
+      <h3>{{ t.name }}</h3>
+      <p class="meta">{{ t.artist.name }}</p>
 
-    <a href="{% url 'track_detail' t.artist.name|urlencode:"" t.name|urlencode:"" %}">Play</a>
-
-    {% if request.user.is_authenticated %}
-      <form action="{% url 'playlist_add' %}" method="post" style="margin-top:6px">
-        {% csrf_token %}
-        <input type="hidden" name="artist" value="{{ t.artist.name }}">
-        <input type="hidden" name="track"  value="{{ t.name }}">
-        <select name="playlist"
-                onchange="this.nextElementSibling.style.display=this.value=='__new__'?'inline':'none'">
-          {% for pl in request.user.playlists.all %}
-            <option value="{{ pl.id }}">{{ pl.name }}</option>
-          {% endfor %}
-          <option value="__new__">＋ New playlist…</option>
-        </select>
-        <input name="new_name" style="display:none" placeholder="Playlist name">
-        <button>Add</button>
-      </form>
-    {% endif %}
-  </div>
-{% endfor %}
+      {% if t.preview %}
+        <details>
+          <summary>▶ 30-sec Preview</summary>
+          <audio controls>
+            <source src="{{ t.preview }}" type="audio/mpeg">
+          </audio>
+        </details>
+      {% endif %}
+    </div>
+  {% endfor %}
 </div>
 {% endblock %}

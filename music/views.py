@@ -97,18 +97,43 @@ def similar(request):
     art, title = request.GET.get("artist"), request.GET.get("track")
     if not (art and title):
         return redirect("home")
+
     data = call_lastfm(
         {"method": "track.getSimilar", "artist": art, "track": title, "limit": 15}
-    )
-    tracks = data["similartracks"]["track"] if data else []
-    return render(
-        request, "similar.html", {"base_track": f"{art} – {title}", "tracks": tracks}
-    )
+    ) or {}
+    tracks = data.get("similartracks", {}).get("track", [])
+    if isinstance(tracks, dict):
+        tracks = [tracks]
+
+    for t in tracks:
+        term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
+        cache_key = "prev:" + term
+        preview = cache.get(cache_key)
+        if preview is None:
+            preview = itunes_preview(term)
+            cache.set(cache_key, preview, 60 * 60)
+        t["preview"] = preview
+
+    ctx = {"base_track": f"{art} – {title}", "tracks": tracks}
+    return render(request, "similar.html", ctx)
 
 
 def live_chart(request):
-    data = call_lastfm({"method": "chart.getTopTracks", "limit": 25})
-    tracks = data["tracks"]["track"] if data else []
+    data = call_lastfm({"method": "chart.getTopTracks", "limit": 25}) or {}
+    tracks = data.get("tracks", {}).get("track", [])
+    if isinstance(tracks, dict):
+        tracks = [tracks]
+
+    # add 30-sec preview
+    for t in tracks:
+        term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
+        cache_key = "prev:" + term
+        preview = cache.get(cache_key)
+        if preview is None:
+            preview = itunes_preview(term)
+            cache.set(cache_key, preview, 60 * 60)
+        t["preview"] = preview
+
     return render(request, "charts.html", {"tracks": tracks})
 
 
@@ -136,34 +161,41 @@ def track_detail(request, artist: str, title: str):
 
 # Deep-cut recommendation (for hardcore fans) -----------------------
 def deepcut(request):
+def deepcut(request):
     art = request.GET.get("artist")
     title = request.GET.get("track")
     if not (art and title):
         return redirect("home")
 
-    # Original track's play count
     base = call_lastfm({"method": "track.getInfo", "artist": art, "track": title})
     if not base:
         return redirect("home")
     base_play = int(base["track"].get("playcount", 1))
 
-    # Retrieve similar tracks
     sim = call_lastfm(
         {"method": "track.getSimilar", "artist": art, "track": title, "limit": 100}
-    )
-    candidates = sim["similartracks"]["track"] if sim else []
+    ) or {}
+    candidates = sim.get("similartracks", {}).get("track", [])
+    if isinstance(candidates, dict):
+        candidates = [candidates]
+
     deep = [
-        t
-        for t in candidates
-        if int(t.get("playcount", 0)) < 0.2 * base_play
-        and int(t.get("playcount", 0)) < 50_000
+        t for t in candidates
+        if int(t.get("playcount", 0)) < 0.2 * base_play and int(t.get("playcount", 0)) < 50_000
     ][:15]
 
-    return render(
-        request,
-        "deepcut.html",
-        {"base_track": f"{art} – {title}", "tracks": deep},
-    )
+    # attach preview url
+    for t in deep:
+        term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
+        cache_key = "prev:" + term
+        preview = cache.get(cache_key)
+        if preview is None:
+            preview = itunes_preview(term)
+            cache.set(cache_key, preview, 60 * 60)
+        t["preview"] = preview
+
+    return render(request, "deepcut.html",
+                  {"base_track": f"{art} – {title}", "tracks": deep})
 
 
 # ------------------------------------------------------------------

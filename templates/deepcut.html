@@ -1,19 +1,24 @@
-{% extends "base.html" %}{% block content %}
-<h2>Deep-cut tracks related to “{{ base_track }}”</h2>
-<p style="font-size:0.9rem;color:var(--muted);margin-bottom:1rem">
-  Less-played songs (under 50 k scrobbles and &lt;20 % of the original).
-</p>
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<a href="/" class="back-btn">← Back</a>
+<h2>Deep-cut picks for {{ base_track }}</h2>
 
 <div class="grid">
-{% for t in tracks %}
-  <div class="card">
-    <h3>{{ t.name }}</h3>
-    <p class="meta">{{ t.artist.name }}</p>
+  {% for t in tracks %}
+    <div class="card">
+      <h3>{{ t.name }}</h3>
+      <p class="meta">{{ t.artist.name }} • {{ t.playcount|default:"?" }} plays</p>
 
-    <a href="{% url 'track_detail' t.artist.name|urlencode:"" t.name|urlencode:"" %}">Play</a>
-  </div>
-{% empty %}
-  <p>No deep-cut matches found.</p>
-{% endfor %}
+      {% if t.preview %}
+        <details>
+          <summary>▶ 30-sec Preview</summary>
+          <audio controls>
+            <source src="{{ t.preview }}" type="audio/mpeg">
+          </audio>
+        </details>
+      {% endif %}
+    </div>
+  {% endfor %}
 </div>
 {% endblock %}
