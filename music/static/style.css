@@ -15,10 +15,17 @@
 /*  Global reset / typography      */
 /* ------------------------------ */
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
+html{
+  /* fluid root font-size: 15 px on small phones → 18 px on desktop */
+  font-size:clamp(15px,3.5vw,18px);
+  -webkit-text-size-adjust:100%;   /* disable iOS auto-zoom */
+  scroll-behavior:smooth;
+}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  background:var(--bg);color:var(--text);line-height:1.6;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.6;
 }
 a{color:var(--primary);text-decoration:none}
 a:hover{text-decoration:underline}
@@ -28,8 +35,10 @@ a:hover{text-decoration:underline}
 /*  Header & Navigation            */
 /* ------------------------------ */
 header{
-  background:var(--card);border-bottom:1px solid var(--border);
-  padding:.75rem 1rem;display:flex;align-items:center;gap:1rem
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  padding:.75rem 1rem;
+  display:flex;align-items:center;gap:1rem
 }
 .logo{font-size:1.4rem;font-weight:bold;color:var(--primary)}
 nav{margin-left:auto;display:flex;gap:1rem;flex-wrap:wrap}
@@ -38,11 +47,10 @@ nav a:hover,nav button:hover{color:var(--primary)}
 nav button{background:none;border:none;cursor:pointer;padding:0}
 
 .back-btn{
-  display:inline-block;margin-bottom:1rem;font-size:0.9rem;
+  display:inline-block;margin-bottom:1rem;font-size:.9rem;
   color:var(--muted);
 }
 .back-btn:hover{text-decoration:underline}
-
 
 /* ------------------------------ */
 /*  Search Bar                     */
@@ -63,7 +71,7 @@ nav button{background:none;border:none;cursor:pointer;padding:0}
 /* ------------------------------ */
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
   gap:1rem
 }
 .card{
@@ -72,6 +80,9 @@ nav button{background:none;border:none;cursor:pointer;padding:0}
 }
 .card h3{font-size:1.05rem}
 .card .meta{font-size:.85rem;color:var(--muted)}
+/* audio preview toggle */
+.card details{margin-bottom:.4rem}
+audio{width:100%;margin-top:.4rem}
 
 /* ------------------------------ */
 /*  Lists                          */
@@ -88,7 +99,7 @@ footer{text-align:center;padding:2rem 0;font-size:.85rem;color:var(--muted)}
 /*  Responsive tweaks                                      */
 /* ====================================================== */
 
-/* ≤768px : ナビを縦積み & 検索バー全幅 */
+/* ≤768 px: stack nav items & make search-bar full width */
 @media(max-width:768px){
   nav{flex-direction:column;align-items:flex-start;gap:.5rem;margin-left:0}
   .search-bar{flex-direction:column}
@@ -96,7 +107,7 @@ footer{text-align:center;padding:2rem 0;font-size:.85rem;color:var(--muted)}
   .search-bar button{margin-top:.5rem;border-left:1px solid var(--border)}
 }
 
-/* ≤480px : グリッド1カラム・余白縮小 */
+/* ≤480 px: single-column grid & tighter paddings */
 @media(max-width:480px){
   .container{padding-block:1rem}
   .grid{grid-template-columns:1fr}
