@@ -17,6 +17,10 @@
           </audio>
         </details>
       {% endif %}
+      <div class="meta">
+        <a href="{% url 'similar' %}?artist={{ t.artist.name|urlencode }}&track={{ t.name|urlencode }}">Similar</a> ·
+        <a href="{% url 'deepcut' %}?artist={{ t.artist.name|urlencode }}&track={{ t.name|urlencode }}">Deep-cut</a>
+      </div>
     </div>
   {% endfor %}
 </div>
