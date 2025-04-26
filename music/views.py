@@ -76,7 +76,7 @@ def track_search(request):
     if not q:
         return redirect("home")
 
-    data = call_lastfm("track.search", track=q, limit=20) or {}
+    data = call_lastfm({"method": "track.search", "track": q, "limit": 20}) or {}
     tracks = data.get("results", {}).get("trackmatches", {}).get("track", [])
     if isinstance(tracks, dict):
         tracks = [tracks]
