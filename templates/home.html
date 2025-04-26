@@ -1,8 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
+<section style="max-width:600px;margin-inline:auto;text-align:center">
+  <h1>Find your next favourite track 🎧</h1>
+  <p>
+    Enter a song or artist to get instant Last.fm recommendations.<br>
+    Explore <strong>similar tracks</strong>, uncover <strong>deep-cut rarities</strong>,
+    and listen to <strong>30-sec previews</strong> before you add them to a playlist.
+  </p>
+
+
 <form action="{% url 'search' %}" method="get" class="search-bar">
   <input name="q" placeholder="Search songs or artists" required>
   <button>Search</button>
 </form>
 <p><a href="{% url 'charts' %}">Browse the current global chart →</a></p>
+
+</section>
 {% endblock %}

@@ -34,6 +34,12 @@
       <a href="{% url 'signup' %}">Sign Up</a>
     {% endif %}
   </nav>
+<!--site-wide search form-->
+  <form action="{% url 'search' %}" method="get" class="search-bar" style="margin-left:auto;max-width:300px">
+  <input name ="q" placeholder="Search for songs or artists…" required>
+  <button>Search</button>
+  </form>
+
 </header>
 
 <main class="container">
