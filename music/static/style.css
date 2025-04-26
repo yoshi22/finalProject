@@ -38,7 +38,7 @@ a:hover{text-decoration:underline}
 header{
   background:var(--card);
   border-bottom:1px solid var(--border);
-  padding:.3rem 1rem;                       /* header vertical padding */
+  padding:.25rem 1rem;                       /* header vertical padding */
   display:flex;align-items:center;gap:1rem;
   flex-wrap:wrap;                            /* allow wrapping on narrow screens */
   position:fixed;top:0;left:0;width:100%;z-index:1000;
