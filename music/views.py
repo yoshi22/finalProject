@@ -1,4 +1,4 @@
-import logging, json
+import logging, json, re
 from typing import Any
 
 import requests
@@ -212,7 +212,7 @@ def deepcut(request):
 
     # attach preview url
     for t in deep:
-        term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
+        term = re.sub(r"[^a-z0-9]", "_", term.lower())
         cache_key = "prev:" + term
         preview = cache.get(cache_key)
         if preview is None:
