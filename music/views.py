@@ -223,6 +223,11 @@ def deepcut(request):
             preview = itunes_preview(term_str)
             cache.set(cache_key, preview, 60 * 60)   # 1-hour cache
         t["preview"] = preview
+    
+    return render(request, "deepcut.html", {
+        "base_track": f"{art} – {title}",
+        "tracks": deep,
+    })
 
 # ------------------------------------------------------------------
 # Sign-up
