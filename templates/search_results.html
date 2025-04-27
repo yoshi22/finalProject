@@ -28,7 +28,6 @@
 
     <a href="{% url 'similar' %}?artist={{ t.artist|urlencode:"" }}&track={{ t.name|urlencode:"" }}">Similar</a>
     <a href="{% url 'deepcut' %}?artist={{ t.artist|urlencode:"" }}&track={{ t.name|urlencode:"" }}">Deep-cut</a>
-    <a href="{% url 'track_detail' t.artist|urlencode:"" t.name|urlencode:"" %}">Detail</a>
 
     {% if request.user.is_authenticated %}
       <form action="{% url 'playlist_add' %}" method="post" style="margin-top:6px">
