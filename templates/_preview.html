@@ -1,0 +1,16 @@
+{#  templates/_preview_player.html  #}
+{% if track.preview %}
+  {# YouTube フル尺があれば iframe、無ければ Apple 30-sec audio #}
+  {% if "youtube.com" in track.preview %}
+    <iframe width="100%" height="180"
+            src="{{ track.preview }}"
+            title="YouTube player"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen></iframe>
+  {% else %}
+    <audio controls style="width:100%">
+      <source src="{{ track.preview }}" type="audio/mpeg">
+    </audio>
+  {% endif %}
+{% endif %}
