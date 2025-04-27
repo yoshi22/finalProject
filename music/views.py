@@ -100,7 +100,6 @@ def track_search(request):
     total   = int(data.get("results", {}).get("opensearch:totalResults", 0))
     has_next = page * 20 < total
     has_prev = page > 1
-    tracks = data.get("results", {}).get("trackmatches", {}).get("track", [])
     if isinstance(tracks, dict):
         tracks = [tracks]
 
