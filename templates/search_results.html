@@ -2,6 +2,17 @@
 <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
 <h2>Results for “{{ query }}”</h2>
 
+  <form style="margin-bottom:.8rem">
+    <input type="hidden" name="q" value="{{ query }}">
+    <input type="hidden" name="page" value="1">
+    Sort&nbsp;
+    <select name="sort" onchange="this.form.submit()">
+      <option value="default"  {% if sort=='default' %}selected{% endif %}>Relevance</option>
+      <option value="listeners"{% if sort=='listeners' %}selected{% endif %}>Most listeners</option>
+      <option value="name"      {% if sort=='name' %}selected{% endif %}>A-Z</option>
+    </select>
+  </form>
+  
 <div class="grid">
 {% for t in tracks %}
   <div class="card">
@@ -44,4 +55,16 @@
   <p>No results found.</p>
 {% endfor %}
 </div>
+
+{% if has_prev or has_next %}
+  <div style="margin:1rem 0;display:flex;gap:1rem">
+    {% if has_prev %}
+      <a href="?q={{ query|urlencode }}&page={{ page|add:-1 }}&sort={{ sort }}">← Prev</a>
+    {% endif %}
+    {% if has_next %}
+      <a href="?q={{ query|urlencode }}&page={{ page|add:1 }}&sort={{ sort }}">Next →</a>
+    {% endif %}
+  </div>
+{% endif %}
+
 {% endblock %}

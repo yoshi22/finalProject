@@ -79,7 +79,25 @@ def track_search(request):
     if not q:
         return redirect("home")
 
-    data = call_lastfm({"method": "track.search", "track": q, "limit": 20}) or {}
+    # pagination & sort
+    page = int(request.GET.get("page", "1") or "1")          # ?page=
+    sort = request.GET.get("sort", "default")                # ?sort=default|listeners|name
+
+    data = call_lastfm("track.search", track=q, limit=20, page=page) or {}
+    tracks = data.get("results", {}).get("trackmatches", {}).get("track", [])
+    if isinstance(tracks, dict):
+        tracks = [tracks]
+
+    # client-side sorting
+    if sort == "listeners":
+        tracks.sort(key=lambda t: int(t.get("listeners", 0)), reverse=True)
+    elif sort == "name":
+        tracks.sort(key=lambda t: t.get("name", "").lower())
+
+    # next/prev page flags
+    total   = int(data.get("results", {}).get("opensearch:totalResults", 0))
+    has_next = page * 20 < total
+    has_prev = page > 1
     tracks = data.get("results", {}).get("trackmatches", {}).get("track", [])
     if isinstance(tracks, dict):
         tracks = [tracks]
@@ -92,8 +110,11 @@ def track_search(request):
     return render(request, "search_results.html", {
         "query": q,
         "tracks": tracks,
+        "page": page,
+        "sort": sort,
+        "has_next": has_next,
+        "has_prev": has_prev,
     })
-
 
 
 def similar(request):
