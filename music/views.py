@@ -212,16 +212,17 @@ def deepcut(request):
 
     # attach preview url
     for t in deep:
-        term = re.sub(r"[^a-z0-9]", "_", term.lower())
-        cache_key = "prev:" + term
+    # build a readable search term
+        term_str = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
+        # sanitise for cache key (memcached-safe)
+        safe_key = re.sub(r"[^a-z0-9]", "_", term_str.lower())
+        cache_key = "prev:" + safe_key
+
         preview = cache.get(cache_key)
         if preview is None:
-            preview = itunes_preview(term)
-            cache.set(cache_key, preview, 60 * 60)
+            preview = itunes_preview(term_str)
+            cache.set(cache_key, preview, 60 * 60)   # 1-hour cache
         t["preview"] = preview
-
-    return render(request, "deepcut.html",
-                  {"base_track": f"{art} – {title}", "tracks": deep})
 
 
 # ------------------------------------------------------------------
