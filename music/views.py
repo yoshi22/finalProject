@@ -21,7 +21,9 @@ API_ROOT = settings.LASTFM_ROOT
 HEADERS = {"User-Agent": settings.LASTFM_USER_AGENT}
 
 
-
+def _lastfm(method: str, **params):
+    params["method"] = method
+    return call_lastfm(params)
 
 def call_lastfm(params: dict[str, Any]) -> dict | None:
     """Wrapper for the Last.fm REST API, returns JSON or None on error."""
@@ -83,7 +85,7 @@ def track_search(request):
     page = int(request.GET.get("page", "1") or "1")          # ?page=
     sort = request.GET.get("sort", "default")                # ?sort=default|listeners|name
 
-    data = call_lastfm("track.search", track=q, limit=20, page=page) or {}
+    data = _lastfm("track.search", track=q, limit=20, page=page) or {}
     tracks = data.get("results", {}).get("trackmatches", {}).get("track", [])
     if isinstance(tracks, dict):
         tracks = [tracks]
