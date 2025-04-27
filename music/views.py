@@ -12,6 +12,7 @@ from .forms import SignUpForm, PlaylistRenameForm, AddTrackForm
 from .models import Artist, Playlist, PlaylistTrack, Track
 from django.core.cache import cache   
 
+from .utils import youtube_id
 
 # ------------------------------------------------------------------
 # Last.fm helper
@@ -105,8 +106,19 @@ def track_search(request):
 
     # ---------- NEW: fetch 30-sec preview URL ----------
     for t in tracks:
-        preview = itunes_preview(f"{t.get('artist')} {t.get('name')}")
-        t["preview"] = preview  # None if not found
+        term_str = f"{t.get('artist')} {t.get('name')}"
+        safe_key = re.sub(r"[^a-z0-9]", "_", term_str.lower())
+        cache_key = "prev:" + safe_key
+
+        preview = cache.get(cache_key)
+        if preview is None:
+            vid = youtube_id(term_str)                       # ① YouTube full
+            if vid:
+                preview = f"https://www.youtube.com/embed/{vid}?autoplay=1"
+            else:                                            # ② fallback Apple 30-sec
+                preview = itunes_preview(term_str)
+            cache.set(cache_key, preview, 60 * 60)           # 1-hour cache
+        t["preview"] = preview
 
     return render(request, "search_results.html", {
         "query": q,
@@ -132,10 +144,15 @@ def similar(request):
 
     for t in tracks:
         term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
-        cache_key = "prev:" + term
+        safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
+        cache_key = "prev:" + safe_key
         preview = cache.get(cache_key)
         if preview is None:
-            preview = itunes_preview(term)
+            vid = youtube_id(term)
+            if vid:
+                preview = f"https://www.youtube.com/embed/{vid}?autoplay=1"
+            else:
+                preview = itunes_preview(term)
             cache.set(cache_key, preview, 60 * 60)
         t["preview"] = preview
 
@@ -152,10 +169,15 @@ def live_chart(request):
     # add 30-sec preview
     for t in tracks:
         term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
-        cache_key = "prev:" + term
+        safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
+        cache_key = "prev:" + safe_key
         preview = cache.get(cache_key)
         if preview is None:
-            preview = itunes_preview(term)
+            vid = youtube_id(term)
+            if vid:
+                preview = f"https://www.youtube.com/embed/{vid}?autoplay=1"
+            else:
+                preview = itunes_preview(term)
             cache.set(cache_key, preview, 60 * 60)
         t["preview"] = preview
 
@@ -219,8 +241,12 @@ def deepcut(request):
 
         preview = cache.get(cache_key)
         if preview is None:
-            preview = itunes_preview(term_str)
-            cache.set(cache_key, preview, 60 * 60)   # 1-hour cache
+            vid = youtube_id(term_str)
+            if vid:
+                preview = f"https://www.youtube.com/embed/{vid}?autoplay=1"
+            else:
+                preview = itunes_preview(term_str)
+            cache.set(cache_key,preview, 60 * 60)
         t["preview"] = preview
     
     return render(request, "deepcut.html", {
