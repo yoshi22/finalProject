@@ -11,10 +11,7 @@
 
       {% if t.preview %}
         <details>
-          <summary>▶ 30-sec Preview</summary>
-          <audio controls>
-            <source src="{{ t.preview }}" type="audio/mpeg">
-          </audio>
+          {% include "_preview_player.html" with track=t %}
         </details>
       {% endif %}
       <div class="meta">

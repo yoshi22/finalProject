@@ -22,11 +22,7 @@
 
     {% if t.preview %}
       <details style="margin-bottom:6px">
-        <summary style="cursor:pointer">▶ 30-sec Preview</summary>
-        <audio controls style="width:100%;margin-top:4px">
-          <source src="{{ t.preview }}" type="audio/mpeg">
-          Your browser does not support the audio element.
-        </audio>
+        {% include "_preview_player.html" with track=t %}
       </details>
     {% endif %}
 
