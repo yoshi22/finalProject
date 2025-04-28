@@ -1,20 +1,33 @@
 {# templates/_preview_player.html #}
-
-{% comment %}Apple 30-sec preview{% endcomment %}
+{# ---------------------------------------------- #}
+{#  Apple 30-sec preview                           #}
+{# ---------------------------------------------- #}
 {% if track.apple_preview %}
   <audio controls style="width:100%">
     <source src="{{ track.apple_preview }}" type="audio/mpeg">
   </audio>
 {% endif %}
 
-{% comment %}YouTube link (opens in new tab) – use watch?v=... 形式{% endcomment %}
+{# ---------------------------------------------- #}
+{#  YouTube link  (embed → watch?v= に変換)        #}
+{# ---------------------------------------------- #}
 {% if track.youtube_url %}
-  <div style="margin-top:.35rem">
-    {# 埋め込み URL → 視聴 URL に変換 #}
-    {% with track.youtube_url|replace:"https://www.youtube.com/embed/","https://www.youtube.com/watch?v=" as watch_url %}
-      <a href="{{ watch_url }}" target="_blank" rel="noopener">
-        ▶︎ Full on YouTube
-      </a>
+  {% comment %}
+    ── embed URL 例 ───────────────────────────────
+    https://www.youtube.com/embed/abcd1234?autoplay=1
+    ── watch URL にしたい─────────────────────────
+    https://www.youtube.com/watch?v=abcd1234
+  {% endcomment %}
+
+  {# ① 余計なクエリ文字列を落とす #}
+  {% with track.youtube_url|cut:'?autoplay=1' as without_qs %}
+    {# ② /embed/ を /watch?v= に置換  (1 文字列引数!) #}
+    {% with without_qs|replace:"/embed/,/watch?v=" as watch_url %}
+      <div style="margin-top:.35rem">
+        <a href="{{ watch_url }}" target="_blank" rel="noopener">
+          ▶︎ Full on YouTube
+        </a>
+      </div>
     {% endwith %}
-  </div>
+  {% endwith %}
 {% endif %}
