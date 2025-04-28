@@ -212,34 +212,49 @@ def artist_detail(request, name: str):
 
 
 def track_detail(request, artist: str, title: str):
-    info = call_lastfm({"method": "track.getInfo", "artist": artist, "track": title})
+    """
+    Track detail page.
+    30-sec Apple preview ＋ YouTube フルリンクの両方を探す。
+    結果は _preview_player.html で描画する。
+    """
+    info = call_lastfm({"method": "track.getInfo",
+                        "artist": artist, "track": title})
     if not info:
         return render(request, "track.html", {"title": None})
-    t = info["track"]
+
+    # ---------- プレビュー／リンク生成 ----------
     term_str = f"{artist} {title}"
     safe_key = re.sub(r"[^a-z0-9]", "_", term_str.lower())
     cache_key = "prev:" + safe_key
-    cached = cache.get(cache_key) or {}
 
-    # Apple 30-sec preview
+    cached: dict = cache.get(cache_key) or {}
+
+    # Apple 30-sec preview (必要なら取得)
     if "apple" not in cached:
         cached["apple"] = itunes_preview(term_str)
 
-    # YouTube watch URL
+    # YouTube watch リンク (必要なら取得)
     if "youtube" not in cached:
         vid = youtube_id(term_str)
-        cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
-    ctx = {
-        "title": t["name"],
-        "artist": t["artist"]["name"],
-        "url": t["url"],
-        "playcount": int(t.get("playcount", 0)),
-        "summary": t.get("wiki", {}).get("summary", ""),
-        "apple_preview": cached["apple"],
-        "youtube_url":   cached["youtube"],       
+        cached["youtube"] = (
+            f"https://www.youtube.com/watch?v={vid}" if vid else None
+        )
 
+    cache.set(cache_key, cached, 60 * 60)
+
+    # ---------- テンプレートへ ----------
+    t = info["track"]
+    ctx = {
+        "title":      t["name"],
+        "artist":     t["artist"]["name"],
+        "url":        t["url"],
+        "playcount":  int(t.get("playcount", 0)),
+        "summary":    t.get("wiki", {}).get("summary", ""),
+        "apple_preview": cached["apple"],
+        "youtube_url":   cached["youtube"],
     }
     return render(request, "track.html", ctx)
+
 
 
 # Deep-cut recommendation (for hardcore fans) -----------------------
