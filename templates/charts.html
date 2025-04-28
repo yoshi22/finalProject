@@ -14,16 +14,9 @@
           {% include "_preview_player.html" with track=t %}
         </details>
       {% endif %}
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <a class="btn" href="{% url 'similar' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">
-          Similar
-        </a>
-        <a class="btn btn--secondary" href="{% url 'deepcut' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">
-          Deep-cut
-        </a>
-        <a class="btn" href="{% url 'track_detail' t.artist|urlencode t.name|urlencode %}">
-          Detail
-        </a>
+      <div class="meta">
+        <a class="btn" href="{% url 'similar' %}?artist={{ t.artist.name|urlencode }}&track={{ t.name|urlencode }}">Similar</a> ·
+        <a class="btn" href="{% url 'deepcut' %}?artist={{ t.artist.name|urlencode }}&track={{ t.name|urlencode }}">Deep-cut</a>
       </div>
     </div>
   {% endfor %}
