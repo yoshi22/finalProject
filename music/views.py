@@ -311,11 +311,11 @@ def deepcut(request):
         
         # ---YouTube full track link----------
         if "youtube" not in cached:
-            vid = youtube_id(term)
+            vid = youtube_id(term_str)
             if vid:
                 cached["youtube"] = f"https://www.youtube.com/watch?v={vid}"
             else:   # ★ fallback
-                q = urllib.parse.quote_plus(term)
+                q = urllib.parse.quote_plus(term_str)
                 cached["youtube"] = f"https://www.youtube.com/results?search_query={q}"
 
         cache.set(cache_key, cached, 60 * 60)
