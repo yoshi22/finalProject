@@ -1,26 +1,15 @@
-{# templates/_preview_player.html #}
-{# ---------------------------------------------- #}
-{#  Apple 30-sec preview                           #}
-{# ---------------------------------------------- #}
+{# Apple 30-sec preview #}
 {% if track.apple_preview %}
   <audio controls style="width:100%">
     <source src="{{ track.apple_preview }}" type="audio/mpeg">
   </audio>
 {% endif %}
 
-{# ---------------------------------------------- #}
-{#  YouTube link - build watch?v=URL from embed URL #}
-{# ---------------------------------------------- #}
+{# YouTube full track #}
 {% if track.youtube_url %}
-  {# ① ?autoplay=1 を削除した embed URL を取得 #}
-  {% with track.youtube_url|cut:"?autoplay=1" as embed_url %}
-    {# ② 動画 ID（常に末尾 11 文字）を切り出す #}
-    {% with embed_url|slice:"-11:" as vid %}
-      <div style="margin-top:.35rem">
-        <a href="https://www.youtube.com/watch?v={{ vid }}" target="_blank" rel="noopener">
-          ▶︎ Full on YouTube
-        </a>
-      </div>
-    {% endwith %}
-  {% endwith %}
+  <div style="margin-top:.35rem">
+    <a href="{{ track.youtube_url }}" target="_blank" rel="noopener">
+      ▶︎ Full on YouTube
+    </a>
+  </div>
 {% endif %}

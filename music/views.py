@@ -119,7 +119,7 @@ def track_search(request):
         # ---YouTube full track link----------
         if "youtube" not in cached:
             vid = youtube_id(term_str)
-            cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
+            cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
 
         cache.set(cache_key, cached, 60 * 60)
 
@@ -163,7 +163,7 @@ def similar(request):
         # ---YouTube full track link----------
         if "youtube" not in cached:
             vid = youtube_id(term)
-            cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
+            cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
 
         cache.set(cache_key, cached, 60 * 60)
 
@@ -195,7 +195,7 @@ def live_chart(request):
         # ---YouTube full track link----------
         if "youtube" not in cached:
             vid = youtube_id(term)
-            cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
+            cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
 
         cache.set(cache_key, cached, 60 * 60)
 
@@ -299,7 +299,7 @@ def deepcut(request):
         # ---YouTube full track link----------
         if "youtube" not in cached:
             vid = youtube_id(term_str)
-            cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
+            cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
 
         cache.set(cache_key, cached, 60 * 60)
 
