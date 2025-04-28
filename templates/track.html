@@ -1,6 +1,8 @@
+{#  templates/track.html  #}
 {% extends "base.html" %}
 {% load static %}
 {% load humanize %}
+
 {% block content %}
 <a href="{% url 'home' %}"
    class="back-btn"
@@ -16,34 +18,37 @@
       {{ artist }} · Plays: {{ playcount|intcomma }}
   </p>
 
-  {# -------------------------------------------------------- #}
-  {#  Apple 30-sec preview + YouTube フルリンク        #}
-  {# -------------------------------------------------------- #}
+  {# ---------- 30-sec Apple preview + YouTube full link ---------- #}
   {% if apple_preview or youtube_url %}
-      {# ---- Apple (ある場合だけ) ---- #}
-      {% if apple_preview %}
-          <audio controls style="width:100%; max-width:360px; margin-top:8px">
-              <source src="{{ apple_preview }}" type="audio/mpeg">
-              Your browser does not support the audio element.
-          </audio>
-          <p style="font-size:0.8rem; color:var(--muted)">
-              30-second preview provided by Apple Music
-          </p>
-      {% endif %}
-
-      {# ---- YouTube (ある場合だけ) ---- #}
-      {% if youtube_url %}
+      <details style="margin-top:.5rem; max-width:360px">
+          <summary style="cursor:pointer; font-weight:600">
+              ▶︎ Preview / YouTube
+          </summary>
           <div style="margin-top:.6rem">
-              <a href="{{ youtube_url }}" target="_blank" rel="noopener">
-                  ▶︎ Full on&nbsp;YouTube
-              </a>
+              {% comment %}Apple Music 30 sec audio{% endcomment %}
+              {% if apple_preview %}
+                  <audio controls style="width:100%">
+                      <source src="{{ apple_preview }}" type="audio/mpeg">
+                  </audio>
+                  <p style="font-size:.75rem;color:var(--muted);margin-top:2px">
+                      30-second preview by Apple Music
+                  </p>
+              {% endif %}
+
+              {% comment %}YouTube full track{% endcomment %}
+              {% if youtube_url %}
+                  <div style="margin-top:.4rem">
+                      <a href="{{ youtube_url }}" target="_blank" rel="noopener">
+                          ▶︎ Full track on YouTube
+                      </a>
+                  </div>
+              {% endif %}
           </div>
-      {% endif %}
+      </details>
   {% else %}
-      <p><em>No preview or link available.</em></p>
+      <p><em>No preview available.</em></p>
   {% endif %}
 
-  {# Track summary #}
   <div class="card" style="margin-top:1rem">
       {{ summary|safe }}
   </div>
