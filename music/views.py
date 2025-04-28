@@ -110,15 +110,22 @@ def track_search(request):
         safe_key = re.sub(r"[^a-z0-9]", "_", term_str.lower())
         cache_key = "prev:" + safe_key
 
-        preview = cache.get(cache_key)
-        if preview is None:
-            vid = youtube_id(term_str)                       # ① YouTube full
-            if vid:
-                preview = f"https://www.youtube.com/embed/{vid}?autoplay=1"
-            else:                                            # ② fallback Apple 30-sec
-                preview = itunes_preview(term_str)
-            cache.set(cache_key, preview, 60 * 60)           # 1-hour cache
-        t["preview"] = preview
+        cached = cache.get(cache_key) or {}
+
+        # ---Apple 30 sec preview ----------
+        if "apple" not in cached:
+            cached["apple"] = itunes_preview(term_str)
+        
+        # ---YouTube full track link----------
+        if "youtube" not in cached:
+            vid = youtube_id(term_str)
+            cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
+
+        cache.set(cache_key, cached, 60 * 60)
+
+        t["apple_preview"] = cached["apple"]
+        t["youtube_url"] = cached["youtube"]
+
 
     return render(request, "search_results.html", {
         "query": q,
@@ -146,15 +153,23 @@ def similar(request):
         term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
         safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
         cache_key = "prev:" + safe_key
-        preview = cache.get(cache_key)
-        if preview is None:
-            vid = youtube_id(term)
-            if vid:
-                preview = f"https://www.youtube.com/embed/{vid}?autoplay=1"
-            else:
-                preview = itunes_preview(term)
-            cache.set(cache_key, preview, 60 * 60)
-        t["preview"] = preview
+
+        cached = cache.get(cache_key) or {}
+
+        # ---Apple 30 sec preview ----------
+        if "apple" not in cached:
+            cached["apple"] = itunes_preview(term_str)
+        
+        # ---YouTube full track link----------
+        if "youtube" not in cached:
+            vid = youtube_id(term_str)
+            cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
+
+        cache.set(cache_key, cached, 60 * 60)
+
+        t["apple_preview"] = cached["apple"]
+        t["youtube_url"] = cached["youtube"]
+
 
     ctx = {"base_track": f"{art} – {title}", "tracks": tracks}
     return render(request, "similar.html", ctx)
@@ -171,15 +186,22 @@ def live_chart(request):
         term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
         safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
         cache_key = "prev:" + safe_key
-        preview = cache.get(cache_key)
-        if preview is None:
-            vid = youtube_id(term)
-            if vid:
-                preview = f"https://www.youtube.com/embed/{vid}?autoplay=1"
-            else:
-                preview = itunes_preview(term)
-            cache.set(cache_key, preview, 60 * 60)
-        t["preview"] = preview
+        cached = cache.get(cache_key) or {}
+
+        # ---Apple 30 sec preview ----------
+        if "apple" not in cached:
+            cached["apple"] = itunes_preview(term_str)
+        
+        # ---YouTube full track link----------
+        if "youtube" not in cached:
+            vid = youtube_id(term_str)
+            cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
+
+        cache.set(cache_key, cached, 60 * 60)
+
+        t["apple_preview"] = cached["apple"]
+        t["youtube_url"] = cached["youtube"]
+
 
     return render(request, "charts.html", {"tracks": tracks})
 
@@ -239,15 +261,22 @@ def deepcut(request):
         safe_key = re.sub(r"[^a-z0-9]", "_", term_str.lower())
         cache_key = "prev:" + safe_key
 
-        preview = cache.get(cache_key)
-        if preview is None:
+        cached = cache.get(cache_key) or {}
+
+        # ---Apple 30 sec preview ----------
+        if "apple" not in cached:
+            cached["apple"] = itunes_preview(term_str)
+        
+        # ---YouTube full track link----------
+        if "youtube" not in cached:
             vid = youtube_id(term_str)
-            if vid:
-                preview = f"https://www.youtube.com/embed/{vid}?autoplay=1"
-            else:
-                preview = itunes_preview(term_str)
-            cache.set(cache_key,preview, 60 * 60)
-        t["preview"] = preview
+            cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
+
+        cache.set(cache_key, cached, 60 * 60)
+
+        t["apple_preview"] = cached["apple"]
+        t["youtube_url"] = cached["youtube"]
+
     
     return render(request, "deepcut.html", {
         "base_track": f"{art} – {title}",
