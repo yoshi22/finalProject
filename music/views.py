@@ -1,4 +1,4 @@
-import logging, json, re
+import logging, json, re, urllib.parse
 from typing import Any
 
 import requests
@@ -13,6 +13,7 @@ from .models import Artist, Playlist, PlaylistTrack, Track
 from django.core.cache import cache   
 
 from .utils import youtube_id
+from .itunes import itunes_preview
 
 # ------------------------------------------------------------------
 # Last.fm helper
@@ -119,7 +120,11 @@ def track_search(request):
         # ---YouTube full track link----------
         if "youtube" not in cached:
             vid = youtube_id(term_str)
-            cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
+            if vid:
+                cached["youtube"] = f"https://www.youtube.com/watch?v={vid}"
+            else:   # ★ fallback
+                q = urllib.parse.quote_plus(term_str)
+                cached["youtube"] = f"https://www.youtube.com/results?search_query={q}"
 
         cache.set(cache_key, cached, 60 * 60)
 
@@ -163,7 +168,11 @@ def similar(request):
         # ---YouTube full track link----------
         if "youtube" not in cached:
             vid = youtube_id(term)
-            cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
+            if vid:
+                cached["youtube"] = f"https://www.youtube.com/watch?v={vid}"
+            else:   # ★ fallback
+                q = urllib.parse.quote_plus(term)
+                cached["youtube"] = f"https://www.youtube.com/results?search_query={q}"
 
         cache.set(cache_key, cached, 60 * 60)
 
@@ -195,7 +204,11 @@ def live_chart(request):
         # ---YouTube full track link----------
         if "youtube" not in cached:
             vid = youtube_id(term)
-            cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
+            if vid:
+                cached["youtube"] = f"https://www.youtube.com/watch?v={vid}"
+            else:   # ★ fallback
+                q = urllib.parse.quote_plus(term)
+                cached["youtube"] = f"https://www.youtube.com/results?search_query={q}"
 
         cache.set(cache_key, cached, 60 * 60)
 
@@ -298,8 +311,12 @@ def deepcut(request):
         
         # ---YouTube full track link----------
         if "youtube" not in cached:
-            vid = youtube_id(term_str)
-            cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
+            vid = youtube_id(term)
+            if vid:
+                cached["youtube"] = f"https://www.youtube.com/watch?v={vid}"
+            else:   # ★ fallback
+                q = urllib.parse.quote_plus(term)
+                cached["youtube"] = f"https://www.youtube.com/results?search_query={q}"
 
         cache.set(cache_key, cached, 60 * 60)
 
