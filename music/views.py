@@ -158,11 +158,11 @@ def similar(request):
 
         # ---Apple 30 sec preview ----------
         if "apple" not in cached:
-            cached["apple"] = itunes_preview(term_str)
+            cached["apple"] = itunes_preview(term)
         
         # ---YouTube full track link----------
         if "youtube" not in cached:
-            vid = youtube_id(term_str)
+            vid = youtube_id(term)
             cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
 
         cache.set(cache_key, cached, 60 * 60)
@@ -190,11 +190,11 @@ def live_chart(request):
 
         # ---Apple 30 sec preview ----------
         if "apple" not in cached:
-            cached["apple"] = itunes_preview(term_str)
+            cached["apple"] = itunes_preview(term)
         
         # ---YouTube full track link----------
         if "youtube" not in cached:
-            vid = youtube_id(term_str)
+            vid = youtube_id(term)
             cached["youtube"] = f"https://www.youtube.com/embed/{vid}?autoplay=1" if vid else None
 
         cache.set(cache_key, cached, 60 * 60)
