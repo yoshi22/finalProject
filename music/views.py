@@ -216,14 +216,28 @@ def track_detail(request, artist: str, title: str):
     if not info:
         return render(request, "track.html", {"title": None})
     t = info["track"]
-    preview = itunes_preview(f"{artist} {title}")
+    term_str = f"{artist} {title}"
+    safe_key = re.sub(r"[^a-z0-9]", "_", term_str.lower())
+    cache_key = "prev:" + safe_key
+    cached = cache.get(cache_key) or {}
+
+    # Apple 30-sec preview
+    if "apple" not in cached:
+        cached["apple"] = itunes_preview(term_str)
+
+    # YouTube watch URL
+    if "youtube" not in cached:
+        vid = youtube_id(term_str)
+        cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
     ctx = {
         "title": t["name"],
         "artist": t["artist"]["name"],
         "url": t["url"],
         "playcount": int(t.get("playcount", 0)),
         "summary": t.get("wiki", {}).get("summary", ""),
-        "preview": preview,
+        "apple_preview": cached["apple"],
+        "youtube_url":   cached["youtube"],       
+
     }
     return render(request, "track.html", ctx)
 

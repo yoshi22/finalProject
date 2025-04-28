@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% load humanize %}
 {% block content %}
 <a href="{% url 'home' %}"
@@ -9,22 +10,43 @@
   ← Back
 </a>
 
-
 {% if title %}
   <h2>{{ title }}</h2>
-  <p class="meta">{{ artist }} · Plays: {{ playcount|intcomma }}</p>
+  <p class="meta">
+      {{ artist }} · Plays: {{ playcount|intcomma }}
+  </p>
 
-  {% if preview %}
-      <audio controls style="width:100%; max-width:360px; margin-top:8px">
-          <source src="{{ preview }}" type="audio/mpeg">
-          Your browser does not support the audio element.
-      </audio>
-      <p style="font-size:0.8rem; color:var(--muted)">30-second preview provided by iTunes.</p>
+  {# -------------------------------------------------------- #}
+  {#  Apple 30-sec preview + YouTube フルリンク        #}
+  {# -------------------------------------------------------- #}
+  {% if apple_preview or youtube_url %}
+      {# ---- Apple (ある場合だけ) ---- #}
+      {% if apple_preview %}
+          <audio controls style="width:100%; max-width:360px; margin-top:8px">
+              <source src="{{ apple_preview }}" type="audio/mpeg">
+              Your browser does not support the audio element.
+          </audio>
+          <p style="font-size:0.8rem; color:var(--muted)">
+              30-second preview provided by Apple Music
+          </p>
+      {% endif %}
+
+      {# ---- YouTube (ある場合だけ) ---- #}
+      {% if youtube_url %}
+          <div style="margin-top:.6rem">
+              <a href="{{ youtube_url }}" target="_blank" rel="noopener">
+                  ▶︎ Full on&nbsp;YouTube
+              </a>
+          </div>
+      {% endif %}
   {% else %}
-      <p><em>No preview available.</em></p>
+      <p><em>No preview or link available.</em></p>
   {% endif %}
 
-  <div class="card" style="margin-top:1rem">{{ summary|safe }}</div>
+  {# Track summary #}
+  <div class="card" style="margin-top:1rem">
+      {{ summary|safe }}
+  </div>
 {% else %}
   <p>Could not fetch track information.</p>
 {% endif %}
