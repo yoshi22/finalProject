@@ -147,3 +147,4 @@ dj-database-url
 django-redis==5.4.0
 django-redis==5.4.0
 django-redis==5.4.0
+

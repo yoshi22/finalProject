@@ -9,7 +9,7 @@
       <h3>{{ t.name }}</h3>
       <p class="meta">{{ t.artist.name }}</p>
 
-      {% if t.preview %}
+      {% if t.apple_preview or t.youtube_url %}            <!-- ★ changed -->
         <details>
           {% include "_preview_player.html" with track=t %}
         </details>
