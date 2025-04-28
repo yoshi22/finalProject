@@ -26,9 +26,17 @@
       </details>
     {% endif %}
 
-    <a href="{% url 'similar' %}?artist={{ t.artist|urlencode:"" }}&track={{ t.name|urlencode:"" }}">Similar</a>
-    <a href="{% url 'deepcut' %}?artist={{ t.artist|urlencode:"" }}&track={{ t.name|urlencode:"" }}">Deep-cut</a>
-
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a class="btn" href="{% url 'similar' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">
+        Similar
+      </a>
+      <a class="btn btn--secondary" href="{% url 'deepcut' %}?artist={{ t.artist|urlencode }}&track={{ t.name|urlencode }}">
+        Deep-cut
+      </a>
+      <a class="btn" href="{% url 'track_detail' t.artist|urlencode t.name|urlencode %}">
+        Detail
+      </a>
+    </div>
     {% if request.user.is_authenticated %}
       <form action="{% url 'playlist_add' %}" method="post" style="margin-top:6px">
         {% csrf_token %}

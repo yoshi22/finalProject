@@ -112,6 +112,29 @@ h2{margin-block:1.5rem 1rem}
 /* ------------------------------ */
 footer{text-align:center;padding:2rem 0;font-size:.85rem;color:var(--muted)}
 
+/* ========== Reusable buttons ========== */
+.btn{
+  display:inline-block;
+  padding:.35rem .9rem;
+  font-size:.9rem;
+  font-weight:600;
+  border:1px solid var(--border);
+  border-radius:4px;
+  background:var(--card);
+  color:var(--muted);
+  transition:all .15s ease;
+  text-decoration:none;
+}
+.btn:hover{
+  background:var(--primary);
+  border-color:var(--primary);
+  color:#fff;
+}
+.btn--secondary{                 
+  background:#f1f1f1;
+}
+
+
 /* ====================================================== */
 /*  Responsive breakpoints                                 */
 /* ====================================================== */
