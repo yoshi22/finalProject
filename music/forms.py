@@ -3,6 +3,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 
 from .models import Playlist
+from .models import VocalProfile
 
 User = get_user_model()
 
@@ -37,3 +38,12 @@ class AddTrackForm(forms.Form):
         max_length=120,
         widget=forms.TextInput(attrs={"placeholder": "New playlist name"}),
     )
+
+class VocalProfileForm(forms.ModelForm):
+    class Meta:
+        model = VocalProfile
+        fields = ("note_min", "note_max")
+        widgets = {
+            "note_min": forms.NumberInput(attrs={"min": 40, "max": 80}),
+            "note_max": forms.NumberInput(attrs={"min": 0, "max": 90}),
+        }

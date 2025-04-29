@@ -8,12 +8,14 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponseBadRequest
 
-from .forms import SignUpForm, PlaylistRenameForm, AddTrackForm
-from .models import Artist, Playlist, PlaylistTrack, Track
+from .forms import SignUpForm, PlaylistRenameForm, AddTrackForm, VocalProfileForm
+from .models import Artist, Playlist, PlaylistTrack, Track, VocalProfile
 from django.core.cache import cache   
 
 from .utils import youtube_id
 from .itunes import itunes_preview
+
+from .lastfm import top_tracks
 
 # ------------------------------------------------------------------
 # Last.fm helper
@@ -450,3 +452,42 @@ def remove_from_playlist(request, pk: int, track_id: int):
     pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
     PlaylistTrack.objects.filter(playlist=pl, track_id=track_id).delete()
     return redirect("playlist_detail", pk=pk)
+
+# ------------------------------------------------------------------
+@login_required
+def vocal_recommend(request):
+    # ---- ① 音域入力 / 更新 -----------------------------------------
+    profile, _ = VocalProfile.objects.get_or_create(user=request.user)
+    if request.method == "POST":
+        form = VocalRangeForm(request.POST, instance=profile)
+        if form.is_valid():
+            form.save()
+            return redirect("vocal_recommend")
+    else:
+        form = VocalRangeForm(instance=profile)
+
+    # ---- ② 候補曲プール --------------------------------------------
+    candidates = top_tracks(limit=200)      # [{'artist':..,'title':..}, ...]
+    reco = []
+    for tr in candidates:
+        spid = spotify_id(tr["artist"], tr["title"])
+        if not spid:
+            continue
+        pr = pitch_range(spid)
+        if not pr:
+            continue
+        lo, hi = pr
+        if profile.note_min <= lo and hi <= profile.note_max:
+            tr["spotify_id"] = spid
+            tr["pitch_low"], tr["pitch_high"] = lo, hi
+            # YouTube フル版リンク
+            vid = youtube_id(f"{tr['artist']} {tr['title']}")
+            if vid:
+                tr["youtube_url"] = f"https://www.youtube.com/watch?v={vid}"
+            reco.append(tr)
+
+    # 人気順でソート（playcount 降順）
+    reco.sort(key=lambda x: -x.get("playcount", 0))
+
+    return render(request, "vocal_recommend.html",
+                  {"form": form, "tracks": reco[:50]})
