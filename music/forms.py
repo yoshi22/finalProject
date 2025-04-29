@@ -47,3 +47,34 @@ class VocalProfileForm(forms.ModelForm):
             "note_min": forms.NumberInput(attrs={"min": 40, "max": 80}),
             "note_max": forms.NumberInput(attrs={"min": 0, "max": 90}),
         }
+
+class VocalRangeForm(forms.ModelForm):
+    """
+    ・note_min, note_max は MIDI ノート番号（整数）を想定
+      └ 例) C4=60, A4=69 …など
+    ・最低音 ≤ 最高音 であることをバリデーション
+    """
+
+    class Meta:
+        model = VocalProfile
+        fields = ("note_min", "note_max")
+        widgets = {
+            "note_min": forms.NumberInput(
+                attrs={"class": "form-control", "min": 21, "max": 108}
+            ),
+            "note_max": forms.NumberInput(
+                attrs={"class": "form-control", "min": 21, "max": 108}
+            ),
+        }
+        labels = {
+            "note_min": "最低音 (MIDI 番号)",
+            "note_max": "最高音 (MIDI 番号)",
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        lo = cleaned.get("note_min")
+        hi = cleaned.get("note_max")
+        if lo is not None and hi is not None and lo > hi:
+            raise ValidationError("最高音は最低音以上にしてください。")
+        return cleaned
