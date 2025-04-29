@@ -1,21 +1,23 @@
-import logging, json, re, urllib.parse
+import json
+import logging
+import re
+import urllib.parse
 from typing import Any
 
 import requests
 from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponseBadRequest
+from django.shortcuts import get_object_or_404, redirect, render
+from django.core.cache import cache
 
-from .forms import SignUpForm, PlaylistRenameForm, AddTrackForm, VocalRangeForm
+from .forms import AddTrackForm, PlaylistRenameForm, SignUpForm, VocalRangeForm
 from .models import Artist, Playlist, PlaylistTrack, Track, VocalProfile
-from django.core.cache import cache   
-
 from .utils import youtube_id
-from .itunes import itunes_preview
-
+from .itunes import itunes_preview            # 外部モジュールで定義
 from .lastfm import top_tracks
+from .spotify import spotify_id, pitch_range  # 置き場所に合わせて import
 
 # ------------------------------------------------------------------
 # Last.fm helper
@@ -28,6 +30,7 @@ HEADERS = {"User-Agent": settings.LASTFM_USER_AGENT}
 def _lastfm(method: str, **params):
     params["method"] = method
     return call_lastfm(params)
+
 
 def call_lastfm(params: dict[str, Any]) -> dict | None:
     """Wrapper for the Last.fm REST API, returns JSON or None on error."""
@@ -43,6 +46,9 @@ def call_lastfm(params: dict[str, Any]) -> dict | None:
         return None
 
 
+# ------------------------------------------------------------------
+# 30-sec  preview helper
+# ------------------------------------------------------------------
 def ensure_preview(track: Track):
     """If the Track lacks preview_url, fetch a 30-sec clip from iTunes and save it."""
     if track.preview_url:
@@ -51,26 +57,6 @@ def ensure_preview(track: Track):
     if url:
         track.preview_url = url
         track.save(update_fields=["preview_url"])
-
-
-# ------------------------------------------------------------------
-# iTunes 30-sec preview helper
-# ------------------------------------------------------------------
-ITUNES_URL = "https://itunes.apple.com/search"
-
-
-def itunes_preview(term: str) -> str | None:
-    """Return previewUrl of first iTunes match (or None)."""
-    try:
-        r = requests.get(
-            ITUNES_URL, params={"term": term, "entity": "song", "limit": 1}, timeout=5
-        )
-        data = r.json()
-        if data.get("resultCount"):
-            return data["results"][0]["previewUrl"]
-    except Exception as exc:
-        logging.warning("iTunes API error: %s", exc)
-    return None
 
 
 # ------------------------------------------------------------------
@@ -101,47 +87,42 @@ def track_search(request):
         tracks.sort(key=lambda t: t.get("name", "").lower())
 
     # next/prev page flags
-    total   = int(data.get("results", {}).get("opensearch:totalResults", 0))
+    total = int(data.get("results", {}).get("opensearch:totalResults", 0))
     has_next = page * 20 < total
     has_prev = page > 1
-    if isinstance(tracks, dict):
-        tracks = [tracks]
 
-    # ---------- NEW: fetch 30-sec preview URL ----------
+    # attach previews
     for t in tracks:
-        term_str = f"{t.get('artist')} {t.get('name')}"
-        safe_key = re.sub(r"[^a-z0-9]", "_", term_str.lower())
+        term = f"{t.get('artist')} {t.get('name')}"
+        safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
         cache_key = "prev:" + safe_key
 
         cached = cache.get(cache_key) or {}
-
-        # ---Apple 30 sec preview ----------
         if "apple" not in cached:
-            cached["apple"] = itunes_preview(term_str)
-        
-        # ---YouTube full track link----------
+            cached["apple"] = itunes_preview(term)
         if "youtube" not in cached:
-            vid = youtube_id(term_str)
-            if vid:
-                cached["youtube"] = f"https://www.youtube.com/watch?v={vid}"
-            else:   # ★ fallback
-                q = urllib.parse.quote_plus(term_str)
-                cached["youtube"] = f"https://www.youtube.com/results?search_query={q}"
-
+            vid = youtube_id(term)
+            cached["youtube"] = (
+                f"https://www.youtube.com/watch?v={vid}"
+                if vid
+                else f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}"
+            )
         cache.set(cache_key, cached, 60 * 60)
-
         t["apple_preview"] = cached["apple"]
         t["youtube_url"] = cached["youtube"]
 
-
-    return render(request, "search_results.html", {
-        "query": q,
-        "tracks": tracks,
-        "page": page,
-        "sort": sort,
-        "has_next": has_next,
-        "has_prev": has_prev,
-    })
+    return render(
+        request,
+        "search_results.html",
+        {
+            "query": q,
+            "tracks": tracks,
+            "page": page,
+            "sort": sort,
+            "has_next": has_next,
+            "has_prev": has_prev,
+        },
+    )
 
 
 def similar(request):
@@ -162,25 +143,18 @@ def similar(request):
         cache_key = "prev:" + safe_key
 
         cached = cache.get(cache_key) or {}
-
-        # ---Apple 30 sec preview ----------
         if "apple" not in cached:
             cached["apple"] = itunes_preview(term)
-        
-        # ---YouTube full track link----------
         if "youtube" not in cached:
             vid = youtube_id(term)
-            if vid:
-                cached["youtube"] = f"https://www.youtube.com/watch?v={vid}"
-            else:   # ★ fallback
-                q = urllib.parse.quote_plus(term)
-                cached["youtube"] = f"https://www.youtube.com/results?search_query={q}"
-
+            cached["youtube"] = (
+                f"https://www.youtube.com/watch?v={vid}"
+                if vid
+                else f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}"
+            )
         cache.set(cache_key, cached, 60 * 60)
-
         t["apple_preview"] = cached["apple"]
         t["youtube_url"] = cached["youtube"]
-
 
     ctx = {"base_track": f"{art} – {title}", "tracks": tracks}
     return render(request, "similar.html", ctx)
@@ -192,31 +166,24 @@ def live_chart(request):
     if isinstance(tracks, dict):
         tracks = [tracks]
 
-    # add 30-sec preview
     for t in tracks:
         term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
         safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
         cache_key = "prev:" + safe_key
-        cached = cache.get(cache_key) or {}
 
-        # ---Apple 30 sec preview ----------
+        cached = cache.get(cache_key) or {}
         if "apple" not in cached:
             cached["apple"] = itunes_preview(term)
-        
-        # ---YouTube full track link----------
         if "youtube" not in cached:
             vid = youtube_id(term)
-            if vid:
-                cached["youtube"] = f"https://www.youtube.com/watch?v={vid}"
-            else:   # ★ fallback
-                q = urllib.parse.quote_plus(term)
-                cached["youtube"] = f"https://www.youtube.com/results?search_query={q}"
-
+            cached["youtube"] = (
+                f"https://www.youtube.com/watch?v={vid}"
+                if vid
+                else f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}"
+            )
         cache.set(cache_key, cached, 60 * 60)
-
         t["apple_preview"] = cached["apple"]
         t["youtube_url"] = cached["youtube"]
-
 
     return render(request, "charts.html", {"tracks": tracks})
 
@@ -227,53 +194,38 @@ def artist_detail(request, name: str):
 
 
 def track_detail(request, artist: str, title: str):
-    """
-    Track detail page.
-    30-sec Apple preview ＋ YouTube フルリンクの両方を探す。
-    結果は _preview_player.html で描画する。
-    """
-    info = call_lastfm({"method": "track.getInfo",
-                        "artist": artist, "track": title})
+    info = call_lastfm({"method": "track.getInfo", "artist": artist, "track": title})
     if not info:
         return render(request, "track.html", {"title": None})
 
-    # ---------- プレビュー／リンク生成 ----------
-    term_str = f"{artist} {title}"
-    safe_key = re.sub(r"[^a-z0-9]", "_", term_str.lower())
+    term = f"{artist} {title}"
+    safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
     cache_key = "prev:" + safe_key
 
-    cached: dict = cache.get(cache_key) or {}
-
-    # Apple 30-sec preview (必要なら取得)
+    cached: dict[str, Any] = cache.get(cache_key) or {}
     if "apple" not in cached:
-        cached["apple"] = itunes_preview(term_str)
-
-    # YouTube watch リンク (必要なら取得)
+        cached["apple"] = itunes_preview(term)
     if "youtube" not in cached:
-        vid = youtube_id(term_str)
-        cached["youtube"] = (
-            f"https://www.youtube.com/watch?v={vid}" if vid else None
-        )
-
+        vid = youtube_id(term)
+        cached["youtube"] = f"https://www.youtube.com/watch?v={vid}" if vid else None
     cache.set(cache_key, cached, 60 * 60)
 
-    # ---------- テンプレートへ ----------
     t = info["track"]
     ctx = {
-        "title":      t["name"],
-        "artist":     t["artist"]["name"],
-        "url":        t["url"],
-        "playcount":  int(t.get("playcount", 0)),
-        "summary":    t.get("wiki", {}).get("summary", ""),
+        "title": t["name"],
+        "artist": t["artist"]["name"],
+        "url": t["url"],
+        "playcount": int(t.get("playcount", 0)),
+        "summary": t.get("wiki", {}).get("summary", ""),
         "apple_preview": cached["apple"],
-        "youtube_url":   cached["youtube"],
+        "youtube_url": cached["youtube"],
     }
     return render(request, "track.html", ctx)
 
 
-
-# Deep-cut recommendation (for hardcore fans) -----------------------
-
+# ------------------------------------------------------------------
+# Deep-cut recommendation
+# ------------------------------------------------------------------
 def deepcut(request):
     art = request.GET.get("artist")
     title = request.GET.get("track")
@@ -293,43 +245,37 @@ def deepcut(request):
         candidates = [candidates]
 
     deep = [
-        t for t in candidates
-        if int(t.get("playcount", 0)) < 0.2 * base_play and int(t.get("playcount", 0)) < 50_000
+        t
+        for t in candidates
+        if int(t.get("playcount", 0)) < 0.2 * base_play
+        and int(t.get("playcount", 0)) < 50_000
     ][:15]
 
-    # attach preview url
     for t in deep:
-    # build a readable search term
-        term_str = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
-        # sanitise for cache key (memcached-safe)
-        safe_key = re.sub(r"[^a-z0-9]", "_", term_str.lower())
+        term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
+        safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
         cache_key = "prev:" + safe_key
 
         cached = cache.get(cache_key) or {}
-
-        # ---Apple 30 sec preview ----------
         if "apple" not in cached:
-            cached["apple"] = itunes_preview(term_str)
-        
-        # ---YouTube full track link----------
+            cached["apple"] = itunes_preview(term)
         if "youtube" not in cached:
-            vid = youtube_id(term_str)
-            if vid:
-                cached["youtube"] = f"https://www.youtube.com/watch?v={vid}"
-            else:   # ★ fallback
-                q = urllib.parse.quote_plus(term_str)
-                cached["youtube"] = f"https://www.youtube.com/results?search_query={q}"
-
+            vid = youtube_id(term)
+            cached["youtube"] = (
+                f"https://www.youtube.com/watch?v={vid}"
+                if vid
+                else f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}"
+            )
         cache.set(cache_key, cached, 60 * 60)
-
         t["apple_preview"] = cached["apple"]
         t["youtube_url"] = cached["youtube"]
 
-    
-    return render(request, "deepcut.html", {
-        "base_track": f"{art} – {title}",
-        "tracks": deep,
-    })
+    return render(
+        request,
+        "deepcut.html",
+        {"base_track": f"{art} – {title}", "tracks": deep},
+    )
+
 
 # ------------------------------------------------------------------
 # Sign-up
@@ -351,10 +297,7 @@ def signup(request):
 # ------------------------------------------------------------------
 @login_required
 def playlist_list(request):
-    """
-    GET : Show the current user's playlists.
-    POST: When hidden field “delete_id” is sent, delete that playlist.
-    """
+    """GET: list playlists  POST: delete playlist"""
     if request.method == "POST":
         delete_id = request.POST.get("delete_id")
         if delete_id:
@@ -365,62 +308,56 @@ def playlist_list(request):
 
 @login_required
 def playlist_detail(request, pk: int):
-    """Display, rename, delete tracks, reorder, and make sure each track has a preview."""
+    """Display, rename, delete tracks, reorder and ensure preview."""
     pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
 
-    # ---------- Rename playlist ----------
+    # Rename
     if "rename" in request.POST:
         form = PlaylistRenameForm(request.POST, instance=pl)
         if form.is_valid():
             form.save()
         return redirect("playlist_detail", pk=pk)
 
-    # ---------- Delete track ----------
+    # Delete track
     if "remove_track" in request.POST:
-        PlaylistTrack.objects.filter(
-            playlist=pl, track_id=request.POST["remove_track"]
-        ).delete()
+        PlaylistTrack.objects.filter(playlist=pl, track_id=request.POST["remove_track"]).delete()
 
-    # ---------- Reorder tracks ----------
+    # Reorder
     if "order" in request.POST:
         try:
             order = json.loads(request.POST["order"])
             for idx, track_id in enumerate(order):
-                PlaylistTrack.objects.filter(
-                    playlist=pl, track_id=track_id
-                ).update(position=idx)
+                PlaylistTrack.objects.filter(playlist=pl, track_id=track_id).update(position=idx)
         except Exception:
             return HttpResponseBadRequest("Invalid order payload")
 
-    # Fetch latest state
     pl.refresh_from_db()
     items = pl.items.select_related("track__artist")
 
-    # ---------- Ensure 30-second preview is ready ----------
     for item in items:
         ensure_preview(item.track)
 
-    context = {
+    ctx = {
         "playlist": pl,
         "tracks": items,
         "rename_form": PlaylistRenameForm(instance=pl),
     }
-    return render(request, "playlist_detail.html", context)
+    return render(request, "playlist_detail.html", ctx)
 
 
 @login_required
 def add_to_playlist(request):
-    """POST back from search_results: choose existing playlist or create a new one."""
+    """POST back from search_results to add track to playlist or new playlist."""
     form = AddTrackForm(request.user, request.POST)
     if not form.is_valid():
-        return redirect("search")  # fallback
+        return redirect("search")
 
     artist = request.POST.get("artist")
     title = request.POST.get("track")
     if not (artist and title):
         return redirect("search")
 
-    # Existing vs. new playlist selection
+    # Existing vs new playlist
     pl_choice = form.cleaned_data["playlist"]
     if pl_choice == "__new__":
         name = form.cleaned_data["new_name"] or "New Playlist"
@@ -430,16 +367,13 @@ def add_to_playlist(request):
 
     art, _ = Artist.objects.get_or_create(name=artist)
     track, _ = Track.objects.get_or_create(title=title, artist=art)
-    PlaylistTrack.objects.get_or_create(
-        playlist=pl, track=track, position=pl.items.count()
-    )
+    PlaylistTrack.objects.get_or_create(playlist=pl, track=track, position=pl.items.count())
     ensure_preview(track)
     return redirect("playlist_detail", pk=pl.pk)
 
 
 @login_required
 def playlist_create(request):
-    """Create a new playlist and redirect to the list page."""
     if request.method == "POST":
         name = request.POST.get("name") or "New Playlist"
         Playlist.objects.create(owner=request.user, name=name)
@@ -448,16 +382,30 @@ def playlist_create(request):
 
 @login_required
 def remove_from_playlist(request, pk: int, track_id: int):
-    """Delete a single track from the playlist and redirect back."""
     pl = get_object_or_404(Playlist, pk=pk, owner=request.user)
     PlaylistTrack.objects.filter(playlist=pl, track_id=track_id).delete()
     return redirect("playlist_detail", pk=pk)
 
+
+# ------------------------------------------------------------------
+# Vocal recommendation
 # ------------------------------------------------------------------
 @login_required
 def vocal_recommend(request):
-    # ---- ① 音域入力 / 更新 -----------------------------------------
-    profile, _ = VocalProfile.objects.get_or_create(user=request.user)
+    """
+    1. 登録フォームで音域を保存
+    2. Last.fm 人気曲の中からユーザー音域に収まる曲を抽出
+    """
+    # ① 音域プロファイル
+    profile, _ = VocalProfile.objects.get_or_create(
+        user=request.user,
+        defaults={"note_min": 60, "note_max": 72},  # C4–C5 初期値
+    )
+    if profile.note_min is None or profile.note_max is None:
+        profile.note_min = profile.note_min or 60
+        profile.note_max = profile.note_max or 72
+        profile.save(update_fields=["note_min", "note_max"])
+
     if request.method == "POST":
         form = VocalRangeForm(request.POST, instance=profile)
         if form.is_valid():
@@ -466,28 +414,26 @@ def vocal_recommend(request):
     else:
         form = VocalRangeForm(instance=profile)
 
-    # ---- ② 候補曲プール --------------------------------------------
-    candidates = top_tracks(limit=200)      # [{'artist':..,'title':..}, ...]
-    reco = []
+    # ② 候補曲
+    candidates = top_tracks(limit=200)  # [{'artist': ..., 'title': ..., 'playcount': ...}, ...]
+    reco: list[dict[str, Any]] = []
+
     for tr in candidates:
         spid = spotify_id(tr["artist"], tr["title"])
         if not spid:
             continue
-        pr = pitch_range(spid)
+        pr = pitch_range(spid)  # (low_midi, high_midi) or None
         if not pr:
             continue
-        lo, hi = pr
-        if profile.note_min <= lo and hi <= profile.note_max:
+        low, high = pr
+        if profile.note_min <= low and high <= profile.note_max:
             tr["spotify_id"] = spid
-            tr["pitch_low"], tr["pitch_high"] = lo, hi
-            # YouTube フル版リンク
+            tr["pitch_low"], tr["pitch_high"] = low, high
             vid = youtube_id(f"{tr['artist']} {tr['title']}")
             if vid:
                 tr["youtube_url"] = f"https://www.youtube.com/watch?v={vid}"
             reco.append(tr)
 
-    # 人気順でソート（playcount 降順）
-    reco.sort(key=lambda x: -x.get("playcount", 0))
+    reco.sort(key=lambda x: -x.get("playcount", 0))  # 人気順
 
-    return render(request, "vocal_recommend.html",
-                  {"form": form, "tracks": reco[:50]})
+    return render(request, "vocal_recommend.html", {"form": form, "tracks": reco[:50]})
