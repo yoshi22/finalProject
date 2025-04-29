@@ -10,9 +10,11 @@ urlpatterns = [
     path("artist/<str:name>/", views.artist_detail, name="artist"),
     path("charts/", views.live_chart, name="charts"),
     path("signup/", views.signup, name="signup"),
+    path("vocal/", views.vocal_recommend, name = "vocal_recommend"),
     # playlist
     path("playlists/", views.playlist_list, name="playlist_list"),
     path("playlists/create/", views.playlist_create, name="playlist_create"),
     path("playlists/<int:pk>/", views.playlist_detail, name="playlist_detail"),
     path("playlist/add/", views.add_to_playlist, name="playlist_add"),
+    
 ]

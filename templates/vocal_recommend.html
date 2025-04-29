@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Search songs to your vocal range</h2>
+<form method="post">
+  {% csrf_token %} {{ form.as_p }} <button type="submit">Update</button>
+</form>
+
+{% if tracks %}
+<table>
+  <tr><th>#</th><th>Artist</th><th>Title</th><th>Key Range</th><th>Preview</th></tr>
+  {% for t in tracks %}
+  <tr>
+    <td>{{ forloop.counter }}</td>
+    <td>{{ t.artist }}</td>
+    <td>{{ t.title }}</td>
+    <td>{{ t.pitch_low }}–{{ t.pitch_high }}</td>
+    <td>
+      <audio src="https://p.scdn.co/mp3-preview/{{ t.spotify_id }}" controls></audio>
+      {% if t.youtube_url %}<a href="{{ t.youtube_url }}" target="_blank">YT</a>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}
