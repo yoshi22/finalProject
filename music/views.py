@@ -17,7 +17,7 @@ from .models import Artist, Playlist, PlaylistTrack, Track, VocalProfile
 from .utils import youtube_id
 from .itunes import itunes_preview            # 外部モジュールで定義
 from .lastfm import top_tracks
-from .spotify import spotify_id, pitch_range  # 置き場所に合わせて import
+from .spotify import spotify_id, pitch_ranges_bulk  # 置き場所に合わせて import
 
 # ------------------------------------------------------------------
 # Last.fm helper
@@ -390,14 +390,22 @@ def remove_from_playlist(request, pk: int, track_id: int):
 # ------------------------------------------------------------------
 # Vocal recommendation
 # ------------------------------------------------------------------
-@login_required
+@@login_required
 def vocal_recommend(request):
     """
-    ユーザの声域に合う楽曲をレコメンドして返すビュー
-    - pitch_range() は use_cache=True で呼び出し、403/404 を即時キャッシュ
-    - ピッチが取れなかった場合は C4–C5 を仮置きして候補を落とさない
+    ユーザの声域 (VocalProfile) に合う楽曲をレコメンドするビュー
+
+    改訂ポイント
+    ------------------------------------------------------------------
+    1. すべての Spotify Track-ID を集めて **pitch_ranges_bulk() を 1 回だけ**
+       呼び出す。ID ごとに 2 リクエスト発生していた従来実装を大幅削減。
+    2. pitch_range が取得できなかった曲は C4–C5 (60–72) を仮置きして
+       候補を落とさないロジックは維持。
+    3. util 側で 403/404 を即キャッシュするため、2 回目以降は
+       ネットワークアクセスがほぼゼロ。
+    ------------------------------------------------------------------
     """
-    # ────────────────────────────────────────────── ① プロファイル
+    # ────────────────────────────── ① プロファイル & フォーム
     defaults = {"note_min": 60, "note_max": 72}            # C4–C5
     profile, _ = VocalProfile.objects.get_or_create(
         user=request.user,
@@ -412,36 +420,42 @@ def vocal_recommend(request):
     else:
         form = VocalRangeForm(instance=profile)
 
-    # ────────────────────────────────────────────── ② 候補曲プール
-    candidates = top_tracks(limit=200)                     # 任意に調整可
+    # ────────────────────────────── ② 候補曲プール
+    candidates = top_tracks(limit=200)                     # plays, hot 100 など
     reco = []
 
+    # ②-a Spotify Track-ID を解決（search はキャッシュされていれば即返）
     for tr in candidates:
-        spid = spotify_id(tr["artist"], tr["title"])
+        tr["spotify_id"] = spotify_id(tr["artist"], tr["title"])
+
+    # ②-b まとめて声域取得（最小 1 API call）
+    spids = [t["spotify_id"] for t in candidates if t["spotify_id"]]
+    ranges = pitch_ranges_bulk(spids)                      # dict[id] = (lo, hi) | None
+
+    # ────────────────────────────── ③ フィルタリング & 補足情報
+    for tr in candidates:
+        spid = tr.get("spotify_id")
         if not spid:
             continue                                       # Spotify に無い
 
-        # ★ 403 / 404 をキャッシュして 2 回目以降は即 return None
-        lo, hi = (pitch_range(spid, use_cache=True) or (60, 72))
+        lo_hi = ranges.get(spid)
+        lo, hi = lo_hi if lo_hi else (60, 72)              # 取れなければ C4–C5
 
-        # ユーザの声域に収まるか判定
+        # ユーザ声域に収まる？
         if profile.note_min <= lo and hi <= profile.note_max:
             term = f"{tr['artist']} {tr['title']}"
-            ytid = youtube_id(term)                        # 失敗時は None
+            ytid = youtube_id(term)
 
             tr.update(
-                spotify_id=spid,
                 pitch_low=lo,
                 pitch_high=hi,
                 apple_preview=itunes_preview(term),        # util 側で 403→None
-                youtube_url=(
-                    f"https://www.youtube.com/watch?v={ytid}" if ytid else ""
-                ),
+                youtube_url=f"https://www.youtube.com/watch?v={ytid}" if ytid else "",
             )
             reco.append(tr)
 
-    # 再生回数順に並べ 50 曲まで返す
-    reco.sort(key=lambda x: -x.get("playcount", 0))
-    context = {"form": form, "tracks": reco[:50]}
+    # ────────────────────────────── ④ 整形して返す
+    reco.sort(key=lambda x: -x.get("playcount", 0))        # 再生回数降順
+    context = {"form": form, "tracks": reco[:50]}          # 上位 50 件まで
 
     return render(request, "vocal_recommend.html", context)

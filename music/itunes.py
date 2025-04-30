@@ -1,31 +1,17 @@
-# music/itunes.py  ★新規ファイル
-import logging
-import requests
-import urllib.parse
+def itunes_preview(term: str, ttl: int = 60 * 60 * 24) -> str | None:
+    key = f"itunes:{term}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
 
-def itunes_preview(term: str) -> str | None:
-    """
-    iTunes Search API から 30-sec preview URL を取得して返す。
-    取得できない場合は None を返す。
-    """
     try:
         res = requests.get(
             "https://itunes.apple.com/search",
-            params={
-                "term": term,
-                "media": "music",
-                "entity": "song",
-                "limit": 1,
-            },
-            timeout=5,
+            params={"term": term, "limit": 1, "media": "music"},
+            timeout=2,          # ★ ここを 10 → 2 秒に短縮
         )
-        res.raise_for_status()
-        js = res.json()
-        if js.get("resultCount"):
-            return js["results"][0].get("previewUrl")
-    except Exception as exc:
-        logging.warning("iTunes preview failed: %s", exc)
-
-    # 失敗時は検索結果ページ (ブラウザにまかせる) を返す
-    q = urllib.parse.quote_plus(term)
-    return f"https://music.apple.com/jp/search?term={q}"
+        url = res.json()["results"][0]["previewUrl"]
+    except Exception:           # noqa: BLE001
+        url = None
+    cache.set(key, url, ttl)
+    return url
