@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
+from django.core import midi_to_spn, spn_to_midi
 
 from .models import Playlist
 from .models import VocalProfile
@@ -49,32 +50,33 @@ class VocalProfileForm(forms.ModelForm):
         }
 
 class VocalRangeForm(forms.ModelForm):
-    """
-    ・note_min, note_max は MIDI ノート番号（整数）を想定
-      └ 例) C4=60, A4=69 …など
-    ・最低音 ≤ 最高音 であることをバリデーション
-    """
+    note_min = SPNField(label="最低音")
+    note_max = SPNField(label="最高音")
 
     class Meta:
-        model = VocalProfile
+        model  = VocalProfile
         fields = ("note_min", "note_max")
-        widgets = {
-            "note_min": forms.NumberInput(
-                attrs={"class": "form-control", "min": 21, "max": 108}
-            ),
-            "note_max": forms.NumberInput(
-                attrs={"class": "form-control", "min": 21, "max": 108}
-            ),
-        }
-        labels = {
-            "note_min": "最低音 (MIDI 番号)",
-            "note_max": "最高音 (MIDI 番号)",
-        }
 
-    def clean(self):
-        cleaned = super().clean()
-        lo = cleaned.get("note_min")
-        hi = cleaned.get("note_max")
-        if lo is not None and hi is not None and lo > hi:
-            raise ValidationError("最高音は最低音以上にしてください。")
-        return cleaned
+    # SPN を初期値として表示
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:                     # 既存レコードあり
+            self.initial["note_min"] = midi_to_spn(self.instance.note_min)
+            self.initial["note_max"] = midi_to_spn(self.instance.note_max)
+
+
+class SPNField(forms.CharField):
+    default_validators = [
+        validators.RegexValidator(
+            regex=r"^\s*[A-Ga-g][#b]?(-?\d)\s*$",
+            message="例）C4, F#3, Bb2 のように入力してください",
+        )
+    ]
+
+    def to_python(self, value):
+        if not value:
+            return None
+        try:
+            return spn_to_midi(value)
+        except ValueError:
+            raise forms.ValidationError("音名＋オクターブ（例：C4）を入力してください")
