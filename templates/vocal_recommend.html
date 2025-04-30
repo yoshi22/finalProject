@@ -25,7 +25,7 @@
       <td>{{ forloop.counter }}</td>
       <td>{{ t.artist }}</td>
       <td>{{ t.title }}</td>
-      <td>{{ t.pitch_low }}–{{ t.pitch_high }}</td>
+      <td>{{ t.pitch_low|spn }} – {{ t.pitch_high|spn }}</td>
       <td>
         {# ---------- decide preview source --------------- #}
         {% firstof t.apple_preview t.preview_url "" as src %}
