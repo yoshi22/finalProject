@@ -1,25 +1,65 @@
+{# templates/vocal_recommend.html #}
 {% extends "base.html" %}
+{% load static %}
+
 {% block content %}
+
 <h2>Search songs to your vocal range</h2>
-<form method="post">
-  {% csrf_token %} {{ form.as_p }} <button type="submit">Update</button>
+
+<form method="post" class="range-form">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit">Update</button>
 </form>
 
 {% if tracks %}
-<table>
-  <tr><th>#</th><th>Artist</th><th>Title</th><th>Key Range</th><th>Preview</th></tr>
-  {% for t in tracks %}
-  <tr>
-    <td>{{ forloop.counter }}</td>
-    <td>{{ t.artist }}</td>
-    <td>{{ t.title }}</td>
-    <td>{{ t.pitch_low }}–{{ t.pitch_high }}</td>
-    <td>
-      <audio src="https://p.scdn.co/mp3-preview/{{ t.spotify_id }}" controls></audio>
-      {% if t.youtube_url %}<a href="{{ t.youtube_url }}" target="_blank">YouTube</a>{% endif %}
-    </td>
-  </tr>
-  {% endfor %}
+<table class="song-table">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Artist</th>
+      <th>Title</th>
+      <th>Key&nbsp;Range<br>(MIDI)</th>
+      <th>Preview</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in tracks %}
+    <tr>
+      <td>{{ forloop.counter }}</td>
+      <td>{{ t.artist }}</td>
+      <td>{{ t.title }}</td>
+      <td>{{ t.pitch_low }}–{{ t.pitch_high }}</td>
+      <td>
+        {# ------- 30-sec preview (Apple ▸ Track.preview_url ▸ Spotify) ------- #}
+        {% with src=t.apple_preview|default:t.preview_url|default_if_none:"" %}
+          {% if not src and t.spotify_id %}
+            {% comment %} fallback to the old spotify preview endpoint {% endcomment %}
+            {% with src="https://p.scdn.co/mp3-preview/"|add:t.spotify_id %}
+            {% endif %}
+          {% endif %}
+        {% endwith %}
+        {% if src %}
+          <audio controls preload="none" style="width: 160px;">
+            <source src="{{ src }}" type="audio/mpeg">
+            <!-- fallback text -->
+            <span>preview</span>
+          </audio>
+        {% else %}
+          <span class="muted">n/a</span>
+        {% endif %}
+
+        {# ------- Full track on YouTube (link is always埋め込み済み) ------- #}
+        {% if t.youtube_url %}
+          <br>
+          <a href="{{ t.youtube_url }}" target="_blank" rel="noopener">
+            ▶︎ YouTube
+          </a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
 </table>
 {% endif %}
 {% endblock %}
