@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
-from django.core import midi_to_spn, spn_to_midi
+from .note_utils import midi_to_spn, spn_to_midi
 
 from .models import Playlist
 from .models import VocalProfile
