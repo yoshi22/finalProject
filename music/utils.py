@@ -73,6 +73,8 @@ def youtube_id(query: str) -> str | None:
             },
             timeout=5,
         )
+        if resp.status_code == 403:
+            return None
         resp.raise_for_status()
 
         items = resp.json().get("items")

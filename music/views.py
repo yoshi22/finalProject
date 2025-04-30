@@ -434,7 +434,7 @@ def vocal_recommend(request):
             cache_key = f"pr:{spid}"
             pr = cache.get(cache_key)
             if pr is None:
-                pr = pitch_range(spid)              # 例外は中で握りつぶす
+                pr = pitch_range(spid, use_cache=True)              # 例外は中で握りつぶす
                 cache.set(cache_key, pr, 24 * 60 * 60)
             lo, hi = pr or (60, 72)                # Fallback
 
