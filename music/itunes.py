@@ -1,3 +1,7 @@
+from .spotify import cache
+ import logging
+ import requests
+
 def itunes_preview(term: str, ttl: int = 60 * 60 * 24) -> str | None:
     key = f"itunes:{term}"
     cached = cache.get(key)
