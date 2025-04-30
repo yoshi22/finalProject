@@ -392,19 +392,11 @@ def remove_from_playlist(request, pk: int, track_id: int):
 # ------------------------------------------------------------------
 @login_required
 def vocal_recommend(request):
-    """
-    1. 登録フォームで音域を保存
-    2. Last.fm 人気曲の中からユーザー音域に収まる曲を抽出
-    """
-    # ① 音域プロファイル
+# ---- ①  音域入力 / プロファイル取得 --------------------------
+    defaults = {"note_min": 60, "note_max": 72}
     profile, _ = VocalProfile.objects.get_or_create(
-        user=request.user,
-        defaults={"note_min": 60, "note_max": 72},  # C4–C5 初期値
+        user=request.user, defaults=defaults
     )
-    if profile.note_min is None or profile.note_max is None:
-        profile.note_min = profile.note_min or 60
-        profile.note_max = profile.note_max or 72
-        profile.save(update_fields=["note_min", "note_max"])
 
     if request.method == "POST":
         form = VocalRangeForm(request.POST, instance=profile)
@@ -414,26 +406,25 @@ def vocal_recommend(request):
     else:
         form = VocalRangeForm(instance=profile)
 
-    # ② 候補曲
-    candidates = top_tracks(limit=200)  # [{'artist': ..., 'title': ..., 'playcount': ...}, ...]
-    reco: list[dict[str, Any]] = []
-
+    # ---- ②  候補曲プール ----------------------------------------
+    candidates = top_tracks(limit=200)
+    reco = []
     for tr in candidates:
         spid = spotify_id(tr["artist"], tr["title"])
         if not spid:
             continue
-        pr = pitch_range(spid)  # (low_midi, high_midi) or None
-        if not pr:
-            continue
-        low, high = pr
-        if profile.note_min <= low and high <= profile.note_max:
-            tr["spotify_id"] = spid
-            tr["pitch_low"], tr["pitch_high"] = low, high
-            vid = youtube_id(f"{tr['artist']} {tr['title']}")
-            if vid:
-                tr["youtube_url"] = f"https://www.youtube.com/watch?v={vid}"
+
+        pr = pitch_range(spid) or (60, 72)     # ←★★ fallback
+        lo, hi = pr
+        if profile.note_min <= lo and hi <= profile.note_max:
+            tr.update(
+                spotify_id=spid,
+                pitch_low=lo,
+                pitch_high=hi,
+                youtube_url=f"https://www.youtube.com/watch?v={youtube_id(tr['artist']+' '+tr['title'])}"
+            )
             reco.append(tr)
 
-    reco.sort(key=lambda x: -x.get("playcount", 0))  # 人気順
-
-    return render(request, "vocal_recommend.html", {"form": form, "tracks": reco[:50]})
+    reco.sort(key=lambda x: -x.get("playcount", 0))
+    return render(request, "vocal_recommend.html",
+                {"form": form, "tracks": reco[:50]})

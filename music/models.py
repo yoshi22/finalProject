@@ -37,12 +37,14 @@ class Track(models.Model):
 
 # ----------  User models  ------------------------------------
 class VocalProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    note_min = models.PositiveSmallIntegerField(help_text="MIDI number of lowest comfortable note")
-    note_max = models.PositiveSmallIntegerField(help_text="MIDI number of highest comfortable note")
+    user      = models.OneToOneField(User, on_delete=models.CASCADE)
+    note_min  = models.PositiveSmallIntegerField(
+        default=60, help_text="…"
+    )
+    note_max  = models.PositiveSmallIntegerField(
+        default=72, help_text="…"
+    )
 
-    def __str__(self):
-        return f"{self.user.username}: {self.note_min}-{self.note_max}"
     
 
 
