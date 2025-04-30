@@ -392,10 +392,13 @@ def remove_from_playlist(request, pk: int, track_id: int):
 # ------------------------------------------------------------------
 @login_required
 def vocal_recommend(request):
-    # ── ①  音域入力 / プロファイル取得 ─────────────────────────────
-    defaults = {"note_min": 60, "note_max": 72}           # C4–C5
+    # ------------------------------------------------------------
+    # ① VocalRange 取得・更新
+    # ------------------------------------------------------------
+    defaults = {"note_min": 60, "note_max": 72}
     profile, _ = VocalProfile.objects.get_or_create(
-        user=request.user, defaults=defaults
+        user=request.user,
+        defaults=defaults,
     )
 
     if request.method == "POST":
@@ -406,48 +409,73 @@ def vocal_recommend(request):
     else:
         form = VocalRangeForm(instance=profile)
 
-    # ── ②  候補曲プール  ─────────────────────────────────────────
-    candidates = top_tracks(limit=200)                    # [{artist,title,playcount}, …]
+    # ------------------------------------------------------------
+    # ② 候補曲プール  * 最大 40 曲に絞る  *
+    # ------------------------------------------------------------
+    CANDIDATE_LIMIT = 40          #  ←★ 同時 API コール量を抑える
+    candidates = top_tracks(limit=CANDIDATE_LIMIT)
+
     reco: list[dict] = []
+    for t in candidates:
+        try:
+            term = f"{t['artist']} {t['title']}"
+            safe = re.sub(r"[^a-z0-9]", "_", term.lower())
 
-    for tr in candidates:
-        # ---- Spotify で検索 & 音域推定 ---------------------------------
-        spid = spotify_id(tr["artist"], tr["title"])
-        if not spid:
+            # ---------- Spotify track id  ------------------------
+            cache_key = f"spid:{safe}"
+            spid = cache.get(cache_key)
+            if spid is None:
+                spid = spotify_id(t["artist"], t["title"])
+                cache.set(cache_key, spid, 60 * 60)
+            if not spid:
+                continue
+
+            # ---------- Pitch Range (±6 semitones) ---------------
+            cache_key = f"pr:{spid}"
+            pr = cache.get(cache_key)
+            if pr is None:
+                pr = pitch_range(spid)              # 例外は中で握りつぶす
+                cache.set(cache_key, pr, 24 * 60 * 60)
+            lo, hi = pr or (60, 72)                # Fallback
+
+            if not (profile.note_min <= lo <= hi <= profile.note_max):
+                continue
+
+            # ---------- YouTube (embed or link)  -----------------
+            cache_key = f"yt:{safe}"
+            yt = cache.get(cache_key)
+            if yt is None:
+                vid = youtube_id(term)
+                if vid:
+                    yt = {
+                        "embed": f"https://www.youtube.com/embed/{vid}",
+                        "url":   f"https://www.youtube.com/watch?v={vid}",
+                    }
+                cache.set(cache_key, yt, 24 * 60 * 60)
+
+            # ---------- Apple 30-sec preview ---------------------
+            cache_key = f"ap:{safe}"
+            apple = cache.get(cache_key)
+            if apple is None:
+                apple = itunes_preview(term)
+                cache.set(cache_key, apple, 24 * 60 * 60)
+
+            # ---------- 最終マージ -------------------------------
+            t.update(
+                spotify_id=spid,
+                pitch_low=lo,
+                pitch_high=hi,
+                youtube_embed=yt and yt.get("embed"),
+                youtube_url=yt and yt.get("url"),
+                apple_preview=apple,
+            )
+            reco.append(t)
+        except Exception as exc:
+            # 外部 API の 403/500 はとにかく握りつぶして次へ
+            logging.warning("vocal_recommend skip: %s", exc)
             continue
 
-        lo, hi = pitch_range(spid) or (60, 72)            # 失敗時は C4–C5
-        if not (profile.note_min <= lo and hi <= profile.note_max):
-            continue
-
-        # ---- プレビュー URL / YouTube embed をキャッシュ付きで取得 -----
-        term = f"{tr['artist']} {tr['title']}"
-        safe = re.sub(r"[^a-z0-9]", "_", term.lower())
-        cache_key = f"prev:{safe}"
-        cached = cache.get(cache_key) or {}
-
-        # Apple 30-sec preview
-        if "apple" not in cached:
-            cached["apple"] = itunes_preview(term)
-
-        # YouTube embed (動画 ID だけ埋め込み形式に)
-        if "yt_embed" not in cached:
-            vid = youtube_id(term)
-            cached["yt_embed"] = f"https://www.youtube.com/embed/{vid}" if vid else None
-
-        cache.set(cache_key, cached, 60 * 60)             # 1 時間キャッシュ
-
-        # ---- 結果を dict に追加してリストへ ----------------------------
-        tr.update(
-            spotify_id   = spid,
-            pitch_low    = lo,
-            pitch_high   = hi,
-            apple_preview= cached["apple"],
-            youtube_embed= cached["yt_embed"],
-        )
-        reco.append(tr)
-
-    # 人気順に並べ替えて 50 曲まで
+    # 人気順
     reco.sort(key=lambda x: -x.get("playcount", 0))
 
     return render(
@@ -455,4 +483,3 @@ def vocal_recommend(request):
         "vocal_recommend.html",
         {"form": form, "tracks": reco[:50]},
     )
-

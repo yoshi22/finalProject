@@ -1,1 +1,1 @@
-web: gunicorn nexttrack.wsgi --log-file -
+web: gunicorn nexttrack.wsgi --timeout 120 --log-file -

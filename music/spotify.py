@@ -63,19 +63,22 @@ def spotify_id(artist: str, title: str) -> Optional[str]:
 
 
 def pitch_range(track_id: str) -> Optional[Tuple[int, int]]:
-    """
-    (low_midi, high_midi) をおおよそ返す。
-      1. audio_analysis.track.key を取得 (0=C … 11=B)
-      2. 中央 C4 (60) に合わせる → base = 60 + key
-      3. ±6 半音 (=1 オクターブ) を歌唱レンジとみなす
-    """
+    """(low_midi, high_midi) or None"""
     try:
         ana = _client().audio_analysis(track_id)
         key = ana["track"]["key"]
-        if key == -1:  # unknown key
+        if key == -1:
             return None
         base = 60 + key
         return base - 6, base + 6
+    except spotipy.SpotifyException as exc:
+        # 401 ⇒ トークン失効 → 再取得
+        if exc.http_status == 401:
+            _client.cache_token = None          # 强制リフレッシュ
+            return pitch_range(track_id)
+        # 403 / 404 はすぐ None
+        logging.warning("audio_analysis 403/404: %s", exc)
+        return None
     except Exception as exc:
         logging.warning("audio_analysis error: %s", exc)
         return None
