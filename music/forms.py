@@ -5,6 +5,7 @@ from .note_utils import midi_to_spn, spn_to_midi
 
 from .models import Playlist
 from .models import VocalProfile
+from .fields import SPNField
 
 User = get_user_model()
 
