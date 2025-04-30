@@ -1,84 +1,81 @@
+# music/spotify.py
 """
-spotify.py
-~~~~~~~~~~
-Spotipy を薄くラップし、(artist, title) から
-・Spotify のトラック ID を取得する `spotify_id`
-・そのトラックの推定音域 (lowest_midi, highest_midi) を返す `pitch_range`
-―― という２関数だけを公開する小さなヘルパー。
-
-本番では Web API で “audio_analysis” を呼ぶが、
-クレデンシャル未設定でもサイトが落ちないよう
-両関数とも None を返すフォールバックを備えている。
+Light-weight Spotify helper
+───────────────────────────
+・client-credentials flow
+・audio_analysis.track.key を中央 (C4≒60) に合わせ、±6 半音を歌唱レンジとみなす
 """
-
 from __future__ import annotations
-
+import os
+import time
 import logging
-from typing import Optional, Tuple
+from typing import Final, Optional, Tuple
 
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
-from django.conf import settings
+
+CID: Final[str] = os.getenv("SPOTIFY_CLIENT_ID", "")
+SECRET: Final[str] = os.getenv("SPOTIFY_CLIENT_SECRET", "")
+
+# 起動時に資格情報がない場合は 1 度だけ警告
+if not CID or not SECRET:
+    logging.warning("SPOTIFY_CLIENT_ID / SECRET が未設定。pitch_range は常に None を返します。")
+
+_sp: Optional[spotipy.Spotify] = None
+_token_exp: float = 0.0
 
 
-# ------------------------------------------------------------
-# Spotipy クライアント (クレデンシャルが無ければ None)
-# ------------------------------------------------------------
-def _build_client() -> Optional[spotipy.Spotify]:
-    cid = getattr(settings, "SPOTIFY_CLIENT_ID", None)
-    secret = getattr(settings, "SPOTIFY_CLIENT_SECRET", None)
-    if not (cid and secret):
-        logging.warning("SPOTIFY_CLIENT_ID / SECRET が未設定。pitch_range は常に None を返します。")
-        return None
-    auth = SpotifyClientCredentials(client_id=cid, client_secret=secret)
-    return spotipy.Spotify(client_credentials_manager=auth, requests_timeout=5, retries=2)
-
-
-_sp = _build_client()
-
-
-# ------------------------------------------------------------
-# Public helpers
-# ------------------------------------------------------------
-def spotify_id(artist: str, title: str) -> Optional[str]:
+def _client() -> spotipy.Spotify:
     """
-    “Queen” / “Bohemian Rhapsody” などから最も一致率が高い
-    Spotify track の ID を返す（見つからなければ None）。
+    キャッシュ付きで Spotify API クライアントを返す。
+    Spotipy ≥2.25 は get_access_token(as_dict=False) がデフォルト。
     """
-    if _sp is None:
-        return None
+    global _sp, _token_exp
 
-    q = f"track:{title} artist:{artist}"
+    if _sp and _token_exp - time.time() > 30:
+        return _sp
+
+    auth = SpotifyClientCredentials(client_id=CID, client_secret=SECRET)
+
     try:
-        items = _sp.search(q, type="track", limit=1)["tracks"]["items"]
+        token_info = auth.get_access_token(as_dict=True)  # ← ★ここが唯一の変更点
+        access_token = token_info["access_token"]
+        _token_exp = token_info["expires_at"]
+    except TypeError:
+        # Spotipy が古い場合は string で返るので、フォールバック
+        access_token = auth.get_access_token()
+        _token_exp = time.time() + 3600  # 1h 有効と仮定
+
+    _sp = spotipy.Spotify(auth=access_token, requests_timeout=5, retries=2)
+    return _sp
+
+
+# ────────────────────────────────────────────────
+def spotify_id(artist: str, title: str) -> Optional[str]:
+    """Search & return first matching track id (or None)."""
+    try:
+        res = _client().search(f"track:{title} artist:{artist}", type="track", limit=1)
+        items = res["tracks"]["items"]
         return items[0]["id"] if items else None
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logging.warning("Spotify search error: %s", exc)
         return None
 
 
 def pitch_range(track_id: str) -> Optional[Tuple[int, int]]:
     """
-    Spotify audio analysis API の中にある
-    `segments` → `pitches` を走査して、
-      - 最低ピッチ（MIDI note number）
-      - 最高ピッチ（MIDI note number）
-    のタプルを返す。失敗時は None。
+    (low_midi, high_midi) をおおよそ返す。
+      1. audio_analysis.track.key を取得 (0=C … 11=B)
+      2. 中央 C4 (60) に合わせる → base = 60 + key
+      3. ±6 半音 (=1 オクターブ) を歌唱レンジとみなす
     """
-    if _sp is None:
-        return None
-
     try:
-        analysis = _sp.audio_analysis(track_id)
-        pitches = [max(seg["pitches"]) for seg in analysis["segments"]]
-        if not pitches:
+        ana = _client().audio_analysis(track_id)
+        key = ana["track"]["key"]
+        if key == -1:  # unknown key
             return None
-        # `pitches` は 12bin の相対強度。index(1.0) が実音
-        # ここでは “一番強い音高” の MIDI ノート番号を大まかに推定
-        midi_base = analysis["track"]["key"]  # 0=C, 1=C#/Db, ...
-        low = midi_base + min(i * 1 for i, v in enumerate(pitches) if v > 0.5)
-        high = midi_base + max(i * 1 for i, v in enumerate(pitches) if v > 0.5)
-        return low, high
-    except Exception as exc:  # noqa: BLE001
-        logging.warning("Spotify audio_analysis error: %s", exc)
+        base = 60 + key
+        return base - 6, base + 6
+    except Exception as exc:
+        logging.warning("audio_analysis error: %s", exc)
         return None
