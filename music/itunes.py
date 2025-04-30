@@ -1,36 +1,56 @@
-# music/itunes.py   ※ファイル全体を確認して修正
+"""
+iTunes Search helper
+────────────────────
+・1 曲 30 秒プレビュー URL を取得
+・403 / 5xx を握りつぶし、結果 (None も含む) をキャッシュ
+・キャッシュキーは safe_key() で Memcached-safe に変換
+"""
+from __future__ import annotations
+
 import logging
-import requests
+import random
+import time
 from typing import Optional
+
+import requests
 from django.core.cache import cache
 
-from .cache_utils import safe_key          # ← 必ず import する
+from .cache_utils import safe_key  # ← 必須
 
 ITUNES_API = "https://itunes.apple.com/search"
 
-def itunes_preview(term: str,
-                   *,
-                   use_cache: bool = True,
-                   cache_ttl: int = 60 * 60 * 24,
-                   country: str = "us") -> Optional[str]:
-    """
-    term で iTunes Search API をたたき 30 秒試聴 URL を返す
-    """
-    key = safe_key("itunes", term)        # ← 必ず safe_key を通す
 
-    if use_cache and (cached := cache.get(key)) is not None:
-        return cached                     # None もキャッシュに入っているかも
+def itunes_preview(
+    term: str,
+    *,
+    use_cache: bool = True,
+    cache_ttl: int = 60 * 60 * 24,
+    country: str = "us",
+) -> Optional[str]:
+    """
+    term（例: "Adele Hello"）で iTunes Search API を叩き、
+    プレビュー URL (30 秒) を返す。取れなければ None。
+    """
+    key = safe_key("itunes", term.lower())
+
+    if use_cache and (hit := cache.get(key)) is not None:
+        return hit  # None もキャッシュされている可能性あり
+
+    # リクエストが集中すると iTunes は 403 を返すため、
+    # 微小な jitter + UA 明示で負荷を散らす
+    time.sleep(random.random() * 0.3)
 
     try:
         resp = requests.get(
             ITUNES_API,
             params=dict(term=term, media="music", limit=1, country=country),
-            timeout=5,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=4,
         )
         resp.raise_for_status()
-        results = resp.json().get("results", [])
-        url = results[0].get("previewUrl") if results else None
-    except Exception as exc:              # pylint: disable=broad-except
+        items = resp.json().get("results", [])
+        url = items[0].get("previewUrl") if items else None
+    except Exception as exc:  # pylint: disable=broad-except
         logging.warning("itunes_preview error: %s", exc)
         url = None
 
