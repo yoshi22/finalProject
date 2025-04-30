@@ -390,12 +390,15 @@ def remove_from_playlist(request, pk: int, track_id: int):
 # ------------------------------------------------------------------
 # Vocal recommendation
 # ------------------------------------------------------------------
-@login_required
+@@login_required
 def vocal_recommend(request):
-    # ------------------------------------------------------------
-    # ① VocalRange 取得・更新
-    # ------------------------------------------------------------
-    defaults = {"note_min": 60, "note_max": 72}
+    """
+    ユーザの声域に合う楽曲をレコメンドして返すビュー
+    - pitch_range() は use_cache=True で呼び出し、403/404 を即時キャッシュ
+    - ピッチが取れなかった場合は C4–C5 を仮置きして候補を落とさない
+    """
+    # ────────────────────────────────────────────── ① プロファイル
+    defaults = {"note_min": 60, "note_max": 72}            # C4–C5
     profile, _ = VocalProfile.objects.get_or_create(
         user=request.user,
         defaults=defaults,
@@ -409,77 +412,36 @@ def vocal_recommend(request):
     else:
         form = VocalRangeForm(instance=profile)
 
-    # ------------------------------------------------------------
-    # ② 候補曲プール  * 最大 40 曲に絞る  *
-    # ------------------------------------------------------------
-    CANDIDATE_LIMIT = 40          #  ←★ 同時 API コール量を抑える
-    candidates = top_tracks(limit=CANDIDATE_LIMIT)
+    # ────────────────────────────────────────────── ② 候補曲プール
+    candidates = top_tracks(limit=200)                     # 任意に調整可
+    reco = []
 
-    reco: list[dict] = []
-    for t in candidates:
-        try:
-            term = f"{t['artist']} {t['title']}"
-            safe = re.sub(r"[^a-z0-9]", "_", term.lower())
+    for tr in candidates:
+        spid = spotify_id(tr["artist"], tr["title"])
+        if not spid:
+            continue                                       # Spotify に無い
 
-            # ---------- Spotify track id  ------------------------
-            cache_key = f"spid:{safe}"
-            spid = cache.get(cache_key)
-            if spid is None:
-                spid = spotify_id(t["artist"], t["title"])
-                cache.set(cache_key, spid, 60 * 60)
-            if not spid:
-                continue
+        # ★ 403 / 404 をキャッシュして 2 回目以降は即 return None
+        lo, hi = (pitch_range(spid, use_cache=True) or (60, 72))
 
-            # ---------- Pitch Range (±6 semitones) ---------------
-            cache_key = f"pr:{spid}"
-            pr = cache.get(cache_key)
-            if pr is None:
-                pr = pitch_range(spid, use_cache=True)              # 例外は中で握りつぶす
-                cache.set(cache_key, pr, 24 * 60 * 60)
-            lo, hi = pr or (60, 72)                # Fallback
+        # ユーザの声域に収まるか判定
+        if profile.note_min <= lo and hi <= profile.note_max:
+            term = f"{tr['artist']} {tr['title']}"
+            ytid = youtube_id(term)                        # 失敗時は None
 
-            if not (profile.note_min <= lo <= hi <= profile.note_max):
-                continue
-
-            # ---------- YouTube (embed or link)  -----------------
-            cache_key = f"yt:{safe}"
-            yt = cache.get(cache_key)
-            if yt is None:
-                vid = youtube_id(term)
-                if vid:
-                    yt = {
-                        "embed": f"https://www.youtube.com/embed/{vid}",
-                        "url":   f"https://www.youtube.com/watch?v={vid}",
-                    }
-                cache.set(cache_key, yt, 24 * 60 * 60)
-
-            # ---------- Apple 30-sec preview ---------------------
-            cache_key = f"ap:{safe}"
-            apple = cache.get(cache_key)
-            if apple is None:
-                apple = itunes_preview(term)
-                cache.set(cache_key, apple, 24 * 60 * 60)
-
-            # ---------- 最終マージ -------------------------------
-            t.update(
+            tr.update(
                 spotify_id=spid,
                 pitch_low=lo,
                 pitch_high=hi,
-                youtube_embed=yt and yt.get("embed"),
-                youtube_url=yt and yt.get("url"),
-                apple_preview=apple,
+                apple_preview=itunes_preview(term),        # util 側で 403→None
+                youtube_url=(
+                    f"https://www.youtube.com/watch?v={ytid}" if ytid else ""
+                ),
             )
-            reco.append(t)
-        except Exception as exc:
-            # 外部 API の 403/500 はとにかく握りつぶして次へ
-            logging.warning("vocal_recommend skip: %s", exc)
-            continue
+            reco.append(tr)
 
-    # 人気順
+    # 再生回数順に並べ 50 曲まで返す
     reco.sort(key=lambda x: -x.get("playcount", 0))
+    context = {"form": form, "tracks": reco[:50]}
 
-    return render(
-        request,
-        "vocal_recommend.html",
-        {"form": form, "tracks": reco[:50]},
-    )
+    return render(request, "vocal_recommend.html", context)

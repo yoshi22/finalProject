@@ -1,31 +1,26 @@
-{# 30-sec Apple Music プレビュー ------------------------------------------------ #}
+{# ── music/templates/_preview_player.html ───────────────────── #}
+
+{# ① 30-sec Apple プレビュー（あればこちらを優先） #}
 {% if track.apple_preview %}
-  <audio controls style="width:100%">
+  <audio controls style="width: 100%;">
     <source src="{{ track.apple_preview }}" type="audio/mpeg">
-    <!-- ブラウザが <audio> をサポートしていない場合のフォールバック -->
-    <a href="{{ track.apple_preview }}" target="_blank" rel="noopener">
-      30-sec preview
-    </a>
+    Your browser does not support the audio element.
   </audio>
 {% endif %}
 
-{# YouTube フル尺再生  --------------------------------------------------------- #}
-{% if track.youtube_embed %}
-  {# 埋め込み再生 (動画 ID が取れた場合) #}
-  <div class="yt-wrapper" style="position:relative;padding-top:56.25%;margin-top:.5rem">
-    <iframe
-      src="{{ track.youtube_embed }}?rel=0&modestbranding=1"
-      title="YouTube video player"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen
-      style="position:absolute;top:0;left:0;width:100%;height:100%;border:none">
-    </iframe>
-  </div>
-{% elif track.youtube_url %}
-  {# 旧 fallback: ID が取れず検索結果ページの URL しかない場合 #}
-  <div style="margin-top:.35rem">
+{# ② Apple が無い場合は Spotify の 30-sec プレビューで補完 #}
+{% if not track.apple_preview and track.spotify_id %}
+  <audio controls style="width: 100%;">
+    <source src="https://p.scdn.co/mp3-preview/{{ track.spotify_id }}" type="audio/mpeg">
+  </audio>
+{% endif %}
+
+{# ③ フル尺は YouTube へリンク #}
+{% if track.youtube_url %}
+  <div style="margin-top: .35rem;">
     <a href="{{ track.youtube_url }}" target="_blank" rel="noopener">
       ▶︎ Full on YouTube
     </a>
   </div>
 {% endif %}
+{# ──────────────────────────────────────────────────────────── #}
