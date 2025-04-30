@@ -390,7 +390,7 @@ def remove_from_playlist(request, pk: int, track_id: int):
 # ------------------------------------------------------------------
 # Vocal recommendation
 # ------------------------------------------------------------------
-@@login_required
+@login_required
 def vocal_recommend(request):
     """
     ユーザの声域に合う楽曲をレコメンドして返すビュー
