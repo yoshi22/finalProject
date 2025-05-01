@@ -2,6 +2,15 @@
 {% extends "base.html" %}
 {% load static %}
 {% load spn %}
+{% load humanize %}
+
+{% block title %}Vocal Range Recommendation{% endblock %}
+{% block description %}
+  Find songs that match your vocal range.
+{% endblock %}
+{% block keywords %}vocal range, song recommendation, music{% endblock %}
+
+{% block css %}
 
 {% block content %}
 <h2>Search songs to your vocal range</h2>
