@@ -1,72 +1,53 @@
 {# templates/vocal_recommend.html #}
 {% extends "base.html" %}
-{% load static %}
-{% load spn %}
-{% load humanize %}
+{% load static spn humanize %}
 
-{# ---------- head meta ---------- #}
-{% block title %}Vocal Range Recommendation{% endblock %}
-{% block description %}Find songs that match your vocal range.{% endblock %}
-{% block keywords %}vocal range, song recommendation, music{% endblock %}
+{% block title   %}Vocal Range Recommendation{% endblock %}
+{% block css     %}{% endblock %}
 
-{# ---------- custom css ---------- #}
-{% block css %}
-<link rel="stylesheet" href="{% static 'style.css' %}">
-{% endblock %}
-
-{# ---------- body ---------- #}
 {% block content %}
-<h2>Search songs that fit <em>your</em> voice</h2>
+<h2>Search songs that fit your voice</h2>
 
-<form method="post" style="margin-bottom:2rem">
+<form method="post" class="vocal-range-form">
   {% csrf_token %}
   {{ form.as_p }}
-  <button type="submit" class="btn">Update</button>
+  <button type="submit" class="btn btn-primary">Update</button>
 </form>
 
 {% if tracks %}
-<table class="track-table">
-  <thead>
-    <tr>
-      <th>#</th>
-      <th>Artist</th>
-      <th>Title</th>
-      <th>Key Range</th>
-      <th>Preview</th>
-      <th>Video</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for t in tracks %}
-      <tr>
-        <td>{{ forloop.counter }}</td>
-        <td>{{ t.artist }}</td>
-        <td>{{ t.title }}</td>
-        <td>{{ t.pitch_low|spn }} – {{ t.pitch_high|spn }}</td>
+  <table class="table table-sm mt-4">
+    <thead>
+      <tr><th>#</th><th>Artist</th><th>Title</th><th>Key Range</th>
+          <th>Preview</th><th>Video</th></tr>
+    </thead>
+    <tbody>
+      {% for t in tracks %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ t.artist }}</td>
+          <td>{{ t.title }}</td>
+          <td>{{ t.pitch_low|spn }}–{{ t.pitch_high|spn }}</td>
 
-        {# ---- 30-sec preview (iTunes → Spotify fallback) ---- #}
-        <td>
+          {# 30-sec preview (iTunes → Spotify fallback) #}
           {% firstof t.apple_preview t.preview_url "" as src %}
-          {% if not src and t.spotify_id %}
-            {% with "https://p.scdn.co/mp3-preview/"|add:t.spotify_id as src %}
-              <audio controls src="{{ src }}"></audio>
-            {% endwith %}
-          {% elif src %}
-            <audio controls src="{{ src }}"></audio>
-          {% else %}
-            n/a
-          {% endif %}
-        </td>
+          <td>
+            {% if not src and t.spotify_id %}
+              <audio src="https://p.scdn.co/mp3-preview/{{ t.spotify_id }}" controls></audio>
+            {% elif src %}
+              <audio src="{{ src }}" controls></audio>
+            {% else %}
+              n/a
+            {% endif %}
+          </td>
 
-        {# ---- YouTube full track ---- #}
-        <td>
-          {% if t.youtube_url %}
-            <a href="{{ t.youtube_url }}" target="_blank" rel="noopener">▶︎ YouTube</a>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
+          <td>
+            {% if t.youtube_url %}
+              <a href="{{ t.youtube_url }}" target="_blank">▶︎ YouTube</a>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 {% endif %}
 {% endblock %}
