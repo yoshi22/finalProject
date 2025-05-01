@@ -450,7 +450,7 @@ def vocal_recommend(request):
                 pitch_low=lo,
                 pitch_high=hi,
                 apple_preview=itunes_preview(term),        # util 側で 403→None
-                youtube_url=f"https://www.youtube.com/watch?v={ytid}" if ytid else f"https://www.youtube.com/results?search_query="f"{urllib.parse.quote_plus(term)}"
+                youtube_url= f"https://www.youtube.com/results?search_query="f"{urllib.parse.quote_plus(term)}"
             )
             reco.append(tr)
 
