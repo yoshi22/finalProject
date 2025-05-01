@@ -4,65 +4,68 @@
 {% load spn %}
 {% load humanize %}
 
+{# ---------- head meta ---------- #}
 {% block title %}Vocal Range Recommendation{% endblock %}
-{% block description %}
-  Find songs that match your vocal range.
-{% endblock %}
+{% block description %}Find songs that match your vocal range.{% endblock %}
 {% block keywords %}vocal range, song recommendation, music{% endblock %}
 
+{# ---------- custom css ---------- #}
 {% block css %}
+<link rel="stylesheet" href="{% static 'style.css' %}">
+{% endblock %}
 
+{# ---------- body ---------- #}
 {% block content %}
-<h2>Search songs to your vocal range</h2>
+<h2>Search songs that fit <em>your</em> voice</h2>
 
-<form method="post" class="range-form">
+<form method="post" style="margin-bottom:2rem">
   {% csrf_token %}
   {{ form.as_p }}
-  <button type="submit">Update</button>
+  <button type="submit" class="btn">Update</button>
 </form>
 
 {% if tracks %}
-<table class="song-table">
+<table class="track-table">
   <thead>
     <tr>
-      <th>#</th><th>Artist</th><th>Title</th>
-      <th>Key&nbsp;Range<br>(MIDI)</th><th>Preview</th>
+      <th>#</th>
+      <th>Artist</th>
+      <th>Title</th>
+      <th>Key Range</th>
+      <th>Preview</th>
+      <th>Video</th>
     </tr>
   </thead>
   <tbody>
-  {% for t in tracks %}
-    <tr>
-      <td>{{ forloop.counter }}</td>
-      <td>{{ t.artist }}</td>
-      <td>{{ t.title }}</td>
-      <td>{{ t.pitch_low|spn }} – {{ t.pitch_high|spn }}</td>
-      <td>
-        {# ---------- decide preview source --------------- #}
-        {% firstof t.apple_preview t.preview_url "" as src %}
-        {% if not src and t.spotify_id %}
-          {# 最後の手段として旧 mp3-preview (30sec) #}
-          {% with "https://p.scdn.co/mp3-preview/"|add:t.spotify_id as src %}
-            <audio controls preload="none" style="width:160px">
-              <source src="{{ src }}" type="audio/mpeg">
-            </audio>
-          {% endwith %}
-        {% elif src %}
-          <audio controls preload="none" style="width:160px">
-            <source src="{{ src }}" type="audio/mpeg">
-          </audio>
-        {% else %}
-          <span class="muted">n/a</span>
-        {% endif %}
+    {% for t in tracks %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ t.artist }}</td>
+        <td>{{ t.title }}</td>
+        <td>{{ t.pitch_low|spn }} – {{ t.pitch_high|spn }}</td>
 
-        {# ---------- YouTube full track --------------- #}
-        {% if t.youtube_url %}
-          <br><a href="{{ t.youtube_url }}" target="_blank" rel="noopener">
-            ▶︎ YouTube
-          </a>
-        {% endif %}
-      </td>
-    </tr>
-  {% endfor %}
+        {# ---- 30-sec preview (iTunes → Spotify fallback) ---- #}
+        <td>
+          {% firstof t.apple_preview t.preview_url "" as src %}
+          {% if not src and t.spotify_id %}
+            {% with "https://p.scdn.co/mp3-preview/"|add:t.spotify_id as src %}
+              <audio controls src="{{ src }}"></audio>
+            {% endwith %}
+          {% elif src %}
+            <audio controls src="{{ src }}"></audio>
+          {% else %}
+            n/a
+          {% endif %}
+        </td>
+
+        {# ---- YouTube full track ---- #}
+        <td>
+          {% if t.youtube_url %}
+            <a href="{{ t.youtube_url }}" target="_blank" rel="noopener">▶︎ YouTube</a>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
   </tbody>
 </table>
 {% endif %}
