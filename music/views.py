@@ -456,6 +456,6 @@ def vocal_recommend(request):
 
     # ────────────────────────────── ④ 整形して返す
     reco.sort(key=lambda x: -x.get("playcount", 0))        # 再生回数降順
-    context = {"form": form, "tracks": reco[:50]}          # 上位 50 件まで
+    context = {"form": form, "tracks": reco[:20]}          # 上位 50 件まで
 
     return render(request, "vocal_recommend.html", context)
