@@ -59,26 +59,36 @@ class VocalRangeForm(forms.ModelForm):
         model  = VocalProfile
         fields = ("note_min", "note_max")
 
-    # SPN を初期値として表示
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance.pk:                     # 既存レコードあり
-            self.initial["note_min"] = midi_to_spn(self.instance.note_min)
-            self.initial["note_max"] = midi_to_spn(self.instance.note_max)
+    def clean(self):
+        cd = super().clean()
+        lo, hi = cd.get("note_min"), cd.get("note_max")
+        if lo is not None and hi is not None and lo > hi:
+            raise forms.ValidationError("最低音は最高音以下にしてください。")
+        return cd
 
+
+SPN_RE = r"^[A-G](?:#|b)?[0-8]$"                   # 例: C4, F#3, Bb2
 
 class SPNField(forms.CharField):
+    """
+    Web では C4, F#3 … と入力させ、モデルへは MIDI (int) を渡すカスタム Field
+    """
     default_validators = [
         validators.RegexValidator(
-            regex=r"^\s*[A-Ga-g][#b]?(-?\d)\s*$",
-            message="例）C4, F#3, Bb2 のように入力してください",
+            regex=SPN_RE,
+            message="例: C4, F#3, Bb2 形式で入力してください",
+            code="invalid_spn",
         )
     ]
 
-    def to_python(self, value):
-        if not value:
+    def to_python(self, value: str | None) -> int | None:            # ⇦ ★ ここで変換
+        if value in self.empty_values:
             return None
-        try:
-            return spn_to_midi(value)
-        except ValueError:
-            raise forms.ValidationError("音名＋オクターブ（例：C4）を入力してください")
+        return spn_to_midi(value.strip())
+
+    def prepare_value(self, value):                                  # フォーム初期値用
+        if value in self.empty_values:
+            return ""
+        if isinstance(value, int):
+            return midi_to_spn(value)
+        return value
