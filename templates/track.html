@@ -16,7 +16,7 @@
     {{ artist }} · Plays: {{ playcount|intcomma }}
   </p>
 
-  {# ---------- 共通プレーヤー ---------- #}
+  {# ---------- Shared Player ---------- #}
   {% if apple_preview or youtube_url %}
     <details open style="margin-top:.6rem; max-width:360px">
       {% include "_preview_player.html" with

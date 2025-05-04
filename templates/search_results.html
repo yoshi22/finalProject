@@ -20,8 +20,9 @@
     <p class="meta">{{ t.artist }}</p>
     {# ---------- NEW preview button ---------- #}
 
-    {% if t.apple_preview or t.youtube_url %}            <!-- ★ changed -->
+    {% if t.apple_preview or t.youtube_url %}
       <details style="margin-bottom:6px">
+        <summary>Preview</summary>
         {% include "_preview_player.html" with track=t %}
       </details>
     {% endif %}

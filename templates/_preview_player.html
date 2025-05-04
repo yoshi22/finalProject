@@ -1,6 +1,6 @@
 {# ── music/templates/_preview_player.html ───────────────────── #}
 
-{# ① 30-sec Apple プレビュー（あればこちらを優先） #}
+{# ① 30-sec Apple Preview (prioritized if available) #}
 {% if track.apple_preview %}
   <audio controls style="width: 100%;">
     <source src="{{ track.apple_preview }}" type="audio/mpeg">
@@ -8,14 +8,14 @@
   </audio>
 {% endif %}
 
-{# ② Apple が無い場合は Spotify の 30-sec プレビューで補完 #}
+{# ② If Apple is unavailable, use Spotify's 30-sec preview as fallback #}
 {% if not track.apple_preview and track.spotify_id %}
   <audio controls style="width: 100%;">
     <source src="https://p.scdn.co/mp3-preview/{{ track.spotify_id }}" type="audio/mpeg">
   </audio>
 {% endif %}
 
-{# ③ フル尺は YouTube へリンク #}
+{# ③ Full version links to YouTube #}
 {% if track.youtube_url %}
   <div style="margin-top: .35rem;">
     <a href="{{ track.youtube_url }}" target="_blank" rel="noopener">

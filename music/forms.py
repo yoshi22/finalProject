@@ -6,33 +6,33 @@ from django.contrib.auth import get_user_model
 from .models import VocalProfile, Playlist
 from .note_utils import spn_to_midi, midi_to_spn
 
-# ──────────────────────────────────────────────────────────────
-#  共通
-# ──────────────────────────────────────────────────────────────
+# ------------------------------
+#  Common
+# ------------------------------
 User   = get_user_model()
-SPN_RE = r"^[A-G](?:#|b)?[0-8]$"           # 例: C4, F#3, Bb2
+SPN_RE = r"^[A-G](?:#|b)?[0-8]$"           # Example: C4, F#3, Bb2
 
 
 class SPNField(forms.CharField):
     """
-    Scientific Pitch Notation (C4, F#3 …) で入出力し、
-    モデルとは MIDI 整数でやり取りするカスタムフィールド。
+    Input and output in Scientific Pitch Notation (C4, F#3, etc.),
+    while interacting with the model as MIDI integers.
     """
     default_validators = [
         validators.RegexValidator(
             regex   = SPN_RE,
-            message = "例: C4, F#3, Bb2 の形式で入力してください",
+            message = "Please input in the format: C4, F#3, Bb2",
             code    = "invalid_spn",
         )
     ]
 
-    # フォーム入力 → Python 値（MIDI int）へ
+    # Form input -> Python value (MIDI int)
     def to_python(self, value: str | None) -> int | None:
         if value in self.empty_values:
             return None
         return spn_to_midi(value.strip())
 
-    # Python 値 → フォーム初期値（SPN 文字列）へ
+    # Python value -> Form initial value (SPN string)
     def prepare_value(self, value):
         if value in self.empty_values:
             return ""
@@ -41,9 +41,9 @@ class SPNField(forms.CharField):
         return value
 
 
-# ──────────────────────────────────────────────────────────────
-#  認証 & Playlist 関連フォーム
-# ──────────────────────────────────────────────────────────────
+# ------------------------------
+#  Authentication & Playlist Forms
+# ------------------------------
 class SignUpForm(UserCreationForm):
     class Meta:
         model   = User
@@ -74,12 +74,12 @@ class AddTrackForm(forms.Form):
         self.fields["playlist"].widget.attrs.update({"style": "font-size:0.9rem"})
 
 
-# ──────────────────────────────────────────────────────────────
-#  Vocal range 入力フォーム
-# ──────────────────────────────────────────────────────────────
+# ------------------------------
+#  Vocal range Input Form
+# ------------------------------
 class VocalRangeForm(forms.ModelForm):
-    note_min = SPNField(label="最低音")
-    note_max = SPNField(label="最高音")
+    note_min = SPNField(label="Lowest Note")
+    note_max = SPNField(label="Highest Note")
 
     class Meta:
         model  = VocalProfile
@@ -89,5 +89,5 @@ class VocalRangeForm(forms.ModelForm):
         cleaned = super().clean()
         lo, hi = cleaned.get("note_min"), cleaned.get("note_max")
         if lo is not None and hi is not None and lo > hi:
-            raise forms.ValidationError("最低音は最高音以下にしてください。")
+            raise forms.ValidationError("The lowest note must be below the highest note.")
         return cleaned
