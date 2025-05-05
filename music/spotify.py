@@ -69,11 +69,12 @@ def _client() -> spotipy.Spotify:
         return _sp
 
     auth = SpotifyClientCredentials(client_id=CID, client_secret=SECRET)
-    try:  # Spotipy ≥ 2.25
+    try:
         tk = auth.get_access_token(as_dict=True)
         token, _token_exp = tk["access_token"], tk["expires_at"]
-    except TypeError:  # Spotipy < 2.25
-        token, _token_exp = auth.get_access_token(), time.time() + 3600
+    except Exception as exc:
+        logging.error("Failed to refresh Spotify token: %s", exc)
+        raise
 
     _sp = spotipy.Spotify(auth=token, requests_timeout=5, retries=2)
     return _sp
@@ -165,7 +166,10 @@ def pitch_ranges_bulk(
         try:
             feats = _client().audio_features(chunk) or []
         except spotipy.SpotifyException as exc:
-            logging.warning("audio_features %s: %s", exc.http_status, exc)
+            if exc.http_status == 403:
+                logging.error("Spotify API returned 403: Check your access token or permissions.")
+            else:
+                logging.warning("audio_features %s: %s", exc.http_status, exc)
             feats = [None] * len(chunk)
         except Exception as exc:  # noqa: BLE001
             logging.warning("audio_features error: %s", exc)

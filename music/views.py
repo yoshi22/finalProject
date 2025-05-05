@@ -394,19 +394,8 @@ def remove_from_playlist(request, pk: int, track_id: int):
 def vocal_recommend(request):
     """
     ユーザの声域 (VocalProfile) に合う楽曲をレコメンドするビュー
-
-    改訂ポイント
-    ------------------------------------------------------------------
-    1. すべての Spotify Track-ID を集めて **pitch_ranges_bulk() を 1 回だけ**
-       呼び出す。ID ごとに 2 リクエスト発生していた従来実装を大幅削減。
-    2. pitch_range が取得できなかった曲は C4–C5 (60–72) を仮置きして
-       候補を落とさないロジックは維持。
-    3. util 側で 403/404 を即キャッシュするため、2 回目以降は
-       ネットワークアクセスがほぼゼロ。
-    ------------------------------------------------------------------
     """
-    # ────────────────────────────── ① プロファイル & フォーム
-    defaults = {"note_min": 60, "note_max": 72}            # C4–C5
+    defaults = {"note_min": 60, "note_max": 72}  # C4–C5
     profile, _ = VocalProfile.objects.get_or_create(
         user=request.user,
         defaults=defaults,
@@ -420,42 +409,56 @@ def vocal_recommend(request):
     else:
         form = VocalRangeForm(instance=profile)
 
-    # ────────────────────────────── ② 候補曲プール
-    candidates = top_tracks(limit=200)                     # plays, hot 100 など
+    # ソートとページングのパラメータを取得
+    sort = request.GET.get("sort", "default")  # ?sort=default|listeners|name
+    page = int(request.GET.get("page", "1"))  # ?page=
+
+    # 候補曲を取得
+    candidates = top_tracks(limit=200)
     reco = []
 
-    # ②-a Spotify Track-ID を解決（search はキャッシュされていれば即返）
     for tr in candidates:
         tr["spotify_id"] = spotify_id(tr["artist"], tr["title"])
+        if not tr["spotify_id"]:
+            continue
 
-    # ②-b まとめて声域取得（最小 1 API call）
-    spids = [t["spotify_id"] for t in candidates if t["spotify_id"]]
-    ranges = pitch_ranges_bulk(spids)                      # dict[id] = (lo, hi) | None
+        lo_hi = pitch_ranges_bulk([tr["spotify_id"]]).get(tr["spotify_id"], None)
+        if lo_hi is None:
+            lo_hi = (60, 72)  # デフォルト値を設定
+        lo, hi = lo_hi
 
-    # ────────────────────────────── ③ フィルタリング & 補足情報
-    for tr in candidates:
-        spid = tr.get("spotify_id")
-        if not spid:
-            continue                                       # Spotify に無い
-
-        lo_hi = ranges.get(spid)
-        lo, hi = lo_hi if lo_hi else (60, 72)              # 取れなければ C4–C5
-
-        # ユーザ声域に収まる？
         if profile.note_min <= lo and hi <= profile.note_max:
             term = f"{tr['artist']} {tr['title']}"
-            ytid = youtube_id(term)
-
             tr.update(
                 pitch_low=lo,
                 pitch_high=hi,
-                apple_preview=itunes_preview(term),        # util 側で 403→None
-                youtube_url= f"https://www.youtube.com/results?search_query="f"{urllib.parse.quote_plus(term)}"
+                apple_preview=itunes_preview(term),
+                youtube_url=f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}",
             )
             reco.append(tr)
 
-    # ────────────────────────────── ④ 整形して返す
-    reco.sort(key=lambda x: -x.get("playcount", 0))        # 再生回数降順
-    context = {"form": form, "tracks": reco[:20]}          # 上位 50 件まで
+    # ソート処理
+    if sort == "listeners":
+        reco.sort(key=lambda x: -x.get("playcount", 0))
+    elif sort == "name":
+        reco.sort(key=lambda x: x.get("title", "").lower())
+
+    # ページング処理
+    per_page = 20
+    total = len(reco)
+    start = (page - 1) * per_page
+    end = start + per_page
+    has_next = end < total
+    has_prev = start > 0
+    reco = reco[start:end]
+
+    context = {
+        "form": form,
+        "tracks": reco,
+        "sort": sort,
+        "page": page,
+        "has_next": has_next,
+        "has_prev": has_prev,
+    }
 
     return render(request, "vocal_recommend.html", context)

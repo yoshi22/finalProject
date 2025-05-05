@@ -14,11 +14,21 @@
   <button type="submit" class="btn btn-primary">Update</button>
 </form>
 
+<form method="get" style="margin-top: 1rem;">
+  Sort by:
+  <select name="sort" onchange="this.form.submit()">
+    <option value="default" {% if sort == 'default' %}selected{% endif %}>Relevance</option>
+    <option value="listeners" {% if sort == 'listeners' %}selected{% endif %}>Most listeners</option>
+    <option value="name" {% if sort == 'name' %}selected{% endif %}>A-Z</option>
+  </select>
+  <input type="hidden" name="page" value="{{ page }}">
+</form>
+
 {% if tracks %}
   <table class="table table-sm mt-4">
     <thead>
       <tr><th>#</th><th>Artist</th><th>Title</th><th>Key Range</th>
-          <th>Preview</th><th>Video</th></tr>
+          <th>Preview</th><th>Video</th><th>Add to Playlist</th></tr>
     </thead>
     <tbody>
       {% for t in tracks %}
@@ -28,13 +38,9 @@
           <td>{{ t.title }}</td>
           <td>{{ t.pitch_low|spn }}–{{ t.pitch_high|spn }}</td>
 
-          {# 30-sec preview (iTunes → Spotify fallback) #}
-          {% firstof t.apple_preview t.preview_url "" as src %}
           <td>
-            {% if not src and t.spotify_id %}
-              <audio src="https://p.scdn.co/mp3-preview/{{ t.spotify_id }}" controls></audio>
-            {% elif src %}
-              <audio src="{{ src }}" controls></audio>
+            {% if t.apple_preview %}
+              <audio src="{{ t.apple_preview }}" controls></audio>
             {% else %}
               n/a
             {% endif %}
@@ -42,12 +48,41 @@
 
           <td>
             {% if t.youtube_url %}
-              <a href="{{ t.youtube_url }}" target="_blank">▶︎ YouTube</a>
+              <a href="{{ t.youtube_url }}" target="_blank">▶ YouTube</a>
+            {% endif %}
+          </td>
+
+          <td>
+            {% if request.user.is_authenticated %}
+              <form action="{% url 'playlist_add' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="artist" value="{{ t.artist }}">
+                <input type="hidden" name="track" value="{{ t.title }}">
+                <select name="playlist" onchange="this.nextElementSibling.style.display=this.value=='__new__'?'inline':'none'">
+                  {% for pl in request.user.playlists.all %}
+                    <option value="{{ pl.id }}">{{ pl.name }}</option>
+                  {% endfor %}
+                  <option value="__new__">＋ New playlist…</option>
+                </select>
+                <input name="new_name" style="display:none" placeholder="Playlist name">
+                <button>Add</button>
+              </form>
             {% endif %}
           </td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
+
+  <div style="margin-top: 1rem;">
+    {% if has_prev %}
+      <a href="?sort={{ sort }}&page={{ page|add:-1 }}">← Previous</a>
+    {% endif %}
+    {% if has_next %}
+      <a href="?sort={{ sort }}&page={{ page|add:1 }}">Next →</a>
+    {% endif %}
+  </div>
+{% else %}
+  <p>No tracks found.</p>
 {% endif %}
 {% endblock %}
