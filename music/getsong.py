@@ -10,17 +10,16 @@ from django.conf import settings
 
 LOG = logging.getLogger(__name__)
 API_ROOT = "https://api.getsong.co"
-API_KEY  = 0000000000000000
+API_KEY  = settings.GETSONGBPM_KEY
 
 
 def _get(endpoint: str, params: Dict) -> Optional[Dict]:
     if not API_KEY:
         LOG.error("GETSONGBPM_KEY 未設定")
         return None
-    hdr = {"x-api-key": API_KEY}
+        params["api_key"] = API_KEY 
     try:
-        res = requests.get(f"{API_ROOT}{endpoint}", params=params, headers=hdr, timeout=8)
-        res.raise_for_status()
+        res = requests.get(f"{API_ROOT}{endpoint}",params=params, timeout=8)  # ← headers 引数を削除
         return res.json()
     except Exception as exc:
         LOG.warning("GetSongBPM API error: %s", exc)

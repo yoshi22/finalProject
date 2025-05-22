@@ -156,6 +156,8 @@ LASTFM_USER_AGENT = "NextTrackStudent/1.0"
 # (Optional) YouTube – still used for fallback search links
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 
+GETSONGBPM_KEY = os.getenv("GETSONGBPM_KEY", "")
+
 # Deezer (preview / artwork)
 DEEZER_ROOT = os.getenv("DEEZER_ROOT", "https://api.deezer.com")
 
@@ -202,3 +204,6 @@ else:
             "TIMEOUT": 60 * 10,  # 10 minutes
         }
     }
+
+# --- GetSongBPM ----------------------------------------------------
+GETSONGBPM_KEY = os.getenv("GETSONGBPM_KEY", "")
