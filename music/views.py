@@ -2,22 +2,28 @@ import json
 import logging
 import re
 import urllib.parse
-from typing import Any
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
-from django.core.cache import cache
 
 from .forms import AddTrackForm, PlaylistRenameForm, SignUpForm, VocalRangeForm
 from .models import Artist, Playlist, PlaylistTrack, Track, VocalProfile
 from .utils import youtube_id
-from .itunes import itunes_preview            # 外部モジュールで定義
+from .itunes import itunes_preview
 from .lastfm import top_tracks
-from .spotify import spotify_id, pitch_ranges_bulk  # 置き場所に合わせて import
+from .deezer import search as dz_search           # Deezer 30-sec preview & ISRC
+from .musicstax import audio_features as ms_audio # key / tempo など
+
+# ------------------------------------------------------------------
+# Logger
+# ------------------------------------------------------------------
+_log = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------
 # Last.fm helper
@@ -32,7 +38,7 @@ def _lastfm(method: str, **params):
     return call_lastfm(params)
 
 
-def call_lastfm(params: dict[str, Any]) -> dict | None:
+def call_lastfm(params: Dict[str, Any]) -> Optional[Dict]:
     """Wrapper for the Last.fm REST API, returns JSON or None on error."""
     params |= {"api_key": API_KEY, "format": "json"}
     try:
@@ -42,12 +48,12 @@ def call_lastfm(params: dict[str, Any]) -> dict | None:
             raise RuntimeError(data["message"])
         return data
     except Exception as exc:
-        logging.warning("Last.fm API error: %s", exc)
+        _log.warning("Last.fm API error: %s", exc)
         return None
 
 
 # ------------------------------------------------------------------
-# 30-sec  preview helper
+# 30-sec preview helper（iTunes Fallback）
 # ------------------------------------------------------------------
 def ensure_preview(track: Track):
     """If the Track lacks preview_url, fetch a 30-sec clip from iTunes and save it."""
@@ -60,6 +66,45 @@ def ensure_preview(track: Track):
 
 
 # ------------------------------------------------------------------
+# キー文字列 → MIDI ノート番号（C4=60）変換テーブル
+# ------------------------------------------------------------------
+_KEY2MIDI = {
+    "C": 60,
+    "C#": 61,
+    "Db": 61,
+    "D": 62,
+    "D#": 63,
+    "Eb": 63,
+    "E": 64,
+    "F": 65,
+    "F#": 66,
+    "Gb": 66,
+    "G": 67,
+    "G#": 68,
+    "Ab": 68,
+    "A": 69,
+    "A#": 70,
+    "Bb": 70,
+    "B": 71,
+}
+
+
+def _estimate_pitch_range(features: Optional[Dict]) -> Tuple[int, int]:
+    """
+    MusicStax から取得した audio_features を基に
+    「おおよそ 1 オクターブ分」の可動域を推定して返す。
+    features が None または key 未取得時は (60, 72) を返す。
+    """
+    if not features:
+        return (60, 72)  # C4–C5 デフォルト
+    key = (features.get("key") or "").strip()
+    root = _KEY2MIDI.get(key.upper())
+    if root is None:
+        return (60, 72)
+    return (root, root + 12)  # 1オクターブ想定
+
+
+# ------------------------------------------------------------------
 # Public pages
 # ------------------------------------------------------------------
 def home(request):
@@ -67,13 +112,17 @@ def home(request):
 
 
 def track_search(request):
+    """
+    Last.fm で検索し、iTunes Preview / YouTube URL を付与した結果一覧を表示。
+    Spotify 依存は完全撤廃、処理内容は従来と同じ。
+    """
     q = request.GET.get("q", "").strip()
     if not q:
         return redirect("home")
 
     # pagination & sort
-    page = int(request.GET.get("page", "1") or "1")          # ?page=
-    sort = request.GET.get("sort", "default")                # ?sort=default|listeners|name
+    page = int(request.GET.get("page", "1") or "1")  # ?page=
+    sort = request.GET.get("sort", "default")  # ?sort=default|listeners|name
 
     data = _lastfm("track.search", track=q, limit=20, page=page) or {}
     tracks = data.get("results", {}).get("trackmatches", {}).get("track", [])
@@ -202,7 +251,7 @@ def track_detail(request, artist: str, title: str):
     safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
     cache_key = "prev:" + safe_key
 
-    cached: dict[str, Any] = cache.get(cache_key) or {}
+    cached: Dict[str, Any] = cache.get(cache_key) or {}
     if "apple" not in cached:
         cached["apple"] = itunes_preview(term)
     if "youtube" not in cached:
@@ -393,7 +442,8 @@ def remove_from_playlist(request, pk: int, track_id: int):
 @login_required
 def vocal_recommend(request):
     """
-    ユーザの声域 (VocalProfile) に合う楽曲をレコメンドするビュー
+    Deezer + MusicStax で推定した音域と、ユーザーの声域 (VocalProfile)
+    を比較してレコメンドする。
     """
     defaults = {"note_min": 60, "note_max": 72}  # C4–C5
     profile, _ = VocalProfile.objects.get_or_create(
@@ -409,7 +459,7 @@ def vocal_recommend(request):
     else:
         form = VocalRangeForm(instance=profile)
 
-    # ソートとページングのパラメータを取得
+    # ソートとページングのパラメータ
     sort = request.GET.get("sort", "default")  # ?sort=default|listeners|name
     page = int(request.GET.get("page", "1"))  # ?page=
 
@@ -418,17 +468,15 @@ def vocal_recommend(request):
     reco = []
 
     for tr in candidates:
-        tr["spotify_id"] = spotify_id(tr["artist"], tr["title"])
-        if not tr["spotify_id"]:
-            continue
+        term = f"{tr['artist']} {tr['title']}"
+        # Deezer で ISRC を取得
+        dz_hit = dz_search(term, limit=1)
+        isrc = dz_hit[0]["isrc"] if dz_hit and dz_hit[0].get("isrc") else None
+        feats = ms_audio(isrc=isrc) or ms_audio(query=term)
+        lo, hi = _estimate_pitch_range(feats)
 
-        lo_hi = pitch_ranges_bulk([tr["spotify_id"]]).get(tr["spotify_id"], None)
-        if lo_hi is None:
-            lo_hi = (60, 72)  # デフォルト値を設定
-        lo, hi = lo_hi
-
+        # ユーザー声域でフィルタ
         if profile.note_min <= lo and hi <= profile.note_max:
-            term = f"{tr['artist']} {tr['title']}"
             tr.update(
                 pitch_low=lo,
                 pitch_high=hi,
@@ -437,13 +485,13 @@ def vocal_recommend(request):
             )
             reco.append(tr)
 
-    # ソート処理
+    # ソート
     if sort == "listeners":
         reco.sort(key=lambda x: -x.get("playcount", 0))
     elif sort == "name":
         reco.sort(key=lambda x: x.get("title", "").lower())
 
-    # ページング処理
+    # ページング
     per_page = 20
     total = len(reco)
     start = (page - 1) * per_page

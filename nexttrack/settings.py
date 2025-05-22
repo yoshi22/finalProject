@@ -1,6 +1,6 @@
 """
 Django settings for nexttrack project (playlist + YouTube-embed edition)
-Adapted for Render free tier deployment
+Adapted for Render free-tier deployment
 """
 
 from pathlib import Path
@@ -9,9 +9,11 @@ from dotenv import load_dotenv
 
 # -------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")                 # read .env locally
+load_dotenv(BASE_DIR / ".env")  # read .env locally
 
-# -- security --------------------------------------------------------
+# -------------------------------------------------------------------
+# Security
+# -------------------------------------------------------------------
 SECRET_KEY = os.getenv("DJANGO_SECRET", "CHANGE_ME_FOR_PRODUCTION")
 DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 
@@ -19,7 +21,9 @@ DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 raw_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "*")
 ALLOWED_HOSTS = [h.strip() for h in raw_hosts.split(",") if h.strip()]
 
-# -- apps ------------------------------------------------------------
+# -------------------------------------------------------------------
+# Installed apps
+# -------------------------------------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -31,10 +35,12 @@ INSTALLED_APPS = [
     "music",
 ]
 
-# -- middleware / URL -----------------------------------------------
+# -------------------------------------------------------------------
+# Middleware / URL routing
+# -------------------------------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",        # ★ add
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # static file service
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -45,7 +51,9 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "nexttrack.urls"
 
-# -- templates -------------------------------------------------------
+# -------------------------------------------------------------------
+# Templates
+# -------------------------------------------------------------------
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -65,8 +73,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "nexttrack.wsgi.application"
 
-# -- database --------------------------------------------------------
-# If DATABASE_URL env var is present (Render Postgres等)、それを優先
+# -------------------------------------------------------------------
+# Database
+# -------------------------------------------------------------------
+# If DATABASE_URL env var is present (e.g. Render Postgres) prefer it
 try:
     import dj_database_url
 
@@ -81,7 +91,7 @@ try:
         }
     }
 except ImportError:
-    # dj_database_url が入っていない開発環境でも動く fallback
+    # Fallback when dj_database_url is absent (local dev)
     DATABASES = {
         "default": {
             "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
@@ -89,18 +99,22 @@ except ImportError:
         }
     }
 
-# -- i18n / tz -------------------------------------------------------
+# -------------------------------------------------------------------
+# Internationalisation / Time-zone
+# -------------------------------------------------------------------
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Tokyo"
 USE_I18N = True
 USE_TZ = True
 
-# -- static / media --------------------------------------------------
+# -------------------------------------------------------------------
+# Static / Media
+# -------------------------------------------------------------------
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# WhiteNoise will compress & fingerprint files for production
+# WhiteNoise compresses & fingerprints static files for production
 STATICFILES_STORAGE = (
     "whitenoise.storage.CompressedManifestStaticFilesStorage"
 )
@@ -108,7 +122,9 @@ STATICFILES_STORAGE = (
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# -- cache -----------------------------------------------------------
+# -------------------------------------------------------------------
+# Cache (loc-mem by default, Redis if REDIS_URL set)
+# -------------------------------------------------------------------
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -116,28 +132,49 @@ CACHES = {
     }
 }
 
-# -- logging ---------------------------------------------------------
+# -------------------------------------------------------------------
+# Logging
+# -------------------------------------------------------------------
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "root": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "INFO")},
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+    },
 }
 
-# -- external API keys ----------------------------------------------
+# -------------------------------------------------------------------
+# External API keys & endpoints
+# -------------------------------------------------------------------
+# Last.fm
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY", "")
 LASTFM_ROOT = "http://ws.audioscrobbler.com/2.0/"
 LASTFM_USER_AGENT = "NextTrackStudent/1.0"
 
+# (Optional) YouTube – still used for fallback search links
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 
+# Deezer (preview / artwork)
+DEEZER_ROOT = os.getenv("DEEZER_ROOT", "https://api.deezer.com")
+
+# MusicStax (audio-features replacement for Spotify)
+MUSICSTAX_ROOT = os.getenv("MUSICSTAX_ROOT", "https://musicstax.com/api")
+MUSICSTAX_KEY = os.getenv("MUSICSTAX_KEY", "")  # ←必須: dashboard で取得したキー
+
+# -------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# -- auth redirect ---------------------------------------------------
+# -------------------------------------------------------------------
+# Auth redirect URLs
+# -------------------------------------------------------------------
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
-# -- security headers when deployed behind TLS proxy ----------------
+# -------------------------------------------------------------------
+# Security headers when deployed behind TLS proxy
+# -------------------------------------------------------------------
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
@@ -145,14 +182,16 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
-# --- cache ----------------------------------------------------------
+# -------------------------------------------------------------------
+# Redis cache override (if REDIS_URL provided)
+# -------------------------------------------------------------------
 if os.getenv("REDIS_URL"):
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
             "LOCATION": os.getenv("REDIS_URL"),
             "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-            "TIMEOUT": 60 * 60,  # 1時間
+            "TIMEOUT": 60 * 60,  # 1 hour
         }
     }
 else:
@@ -160,6 +199,6 @@ else:
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
             "LOCATION": "nexttrack-cache",
-            "TIMEOUT": 60 * 10,
+            "TIMEOUT": 60 * 10,  # 10 minutes
         }
     }
