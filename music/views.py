@@ -1,3 +1,10 @@
+"""
+views.py – NextTrack (Deezer + GetSongBPM 版)
+
+Spotify/MusicStax 依存を完全排除し、30-sec プレビューは Deezer
+（fallback に iTunes）、Key/Mode/BPM は GetSongBPM API を利用。
+"""
+
 import json
 import logging
 import re
@@ -17,8 +24,8 @@ from .models import Artist, Playlist, PlaylistTrack, Track, VocalProfile
 from .utils import youtube_id
 from .itunes import itunes_preview
 from .lastfm import top_tracks
-from .deezer import search as dz_search           # Deezer 30-sec preview & ISRC
-from .musicstax import audio_features as ms_audio # key / tempo など
+from .deezer import search as dz_search               # Deezer preview / art
+from .getsong import audio_features as gs_audio       # Key / BPM via GetSongBPM
 
 # ------------------------------------------------------------------
 # Logger
@@ -66,42 +73,24 @@ def ensure_preview(track: Track):
 
 
 # ------------------------------------------------------------------
-# キー文字列 → MIDI ノート番号（C4=60）変換テーブル
+# Key → MIDI conversion table (C4 = 60)
 # ------------------------------------------------------------------
 _KEY2MIDI = {
-    "C": 60,
-    "C#": 61,
-    "Db": 61,
-    "D": 62,
-    "D#": 63,
-    "Eb": 63,
-    "E": 64,
-    "F": 65,
-    "F#": 66,
-    "Gb": 66,
-    "G": 67,
-    "G#": 68,
-    "Ab": 68,
-    "A": 69,
-    "A#": 70,
-    "Bb": 70,
-    "B": 71,
+    "C": 60, "C#": 61, "Db": 61, "D": 62, "D#": 63, "Eb": 63, "E": 64,
+    "F": 65, "F#": 66, "Gb": 66, "G": 67, "G#": 68, "Ab": 68, "A": 69,
+    "A#": 70, "Bb": 70, "B": 71,
 }
 
 
-def _estimate_pitch_range(features: Optional[Dict]) -> Tuple[int, int]:
+def _estimate_pitch_range(feat: Optional[Dict]) -> Tuple[int, int]:
     """
-    MusicStax から取得した audio_features を基に
-    「おおよそ 1 オクターブ分」の可動域を推定して返す。
-    features が None または key 未取得時は (60, 72) を返す。
+    GetSongBPM が返す key / tempo から ±1oct 程度の可動域を推定。
+    key が無い場合は C4–C5 を返す。
     """
-    if not features:
-        return (60, 72)  # C4–C5 デフォルト
-    key = (features.get("key") or "").strip()
-    root = _KEY2MIDI.get(key.upper())
-    if root is None:
+    if not feat:
         return (60, 72)
-    return (root, root + 12)  # 1オクターブ想定
+    root = _KEY2MIDI.get((feat.get("key") or "").strip().upper())
+    return (root, root + 12) if root is not None else (60, 72)
 
 
 # ------------------------------------------------------------------
@@ -114,28 +103,24 @@ def home(request):
 def track_search(request):
     """
     Last.fm で検索し、iTunes Preview / YouTube URL を付与した結果一覧を表示。
-    Spotify 依存は完全撤廃、処理内容は従来と同じ。
     """
     q = request.GET.get("q", "").strip()
     if not q:
         return redirect("home")
 
-    # pagination & sort
-    page = int(request.GET.get("page", "1") or "1")  # ?page=
-    sort = request.GET.get("sort", "default")  # ?sort=default|listeners|name
+    page = int(request.GET.get("page", "1") or "1")
+    sort = request.GET.get("sort", "default")
 
     data = _lastfm("track.search", track=q, limit=20, page=page) or {}
     tracks = data.get("results", {}).get("trackmatches", {}).get("track", [])
     if isinstance(tracks, dict):
         tracks = [tracks]
 
-    # client-side sorting
     if sort == "listeners":
         tracks.sort(key=lambda t: int(t.get("listeners", 0)), reverse=True)
     elif sort == "name":
         tracks.sort(key=lambda t: t.get("name", "").lower())
 
-    # next/prev page flags
     total = int(data.get("results", {}).get("opensearch:totalResults", 0))
     has_next = page * 20 < total
     has_prev = page > 1
@@ -406,7 +391,6 @@ def add_to_playlist(request):
     if not (artist and title):
         return redirect("search")
 
-    # Existing vs new playlist
     pl_choice = form.cleaned_data["playlist"]
     if pl_choice == "__new__":
         name = form.cleaned_data["new_name"] or "New Playlist"
@@ -437,19 +421,16 @@ def remove_from_playlist(request, pk: int, track_id: int):
 
 
 # ------------------------------------------------------------------
-# Vocal recommendation
+# Vocal recommendation – GetSongBPM 版
 # ------------------------------------------------------------------
 @login_required
 def vocal_recommend(request):
     """
-    Deezer + MusicStax で推定した音域と、ユーザーの声域 (VocalProfile)
-    を比較してレコメンドする。
+    Deezer preview と GetSongBPM の音響特徴 (key / tempo) を使い、
+    ユーザー声域 (VocalProfile) に合う曲を推薦。
     """
     defaults = {"note_min": 60, "note_max": 72}  # C4–C5
-    profile, _ = VocalProfile.objects.get_or_create(
-        user=request.user,
-        defaults=defaults,
-    )
+    profile, _ = VocalProfile.objects.get_or_create(user=request.user, defaults=defaults)
 
     if request.method == "POST":
         form = VocalRangeForm(request.POST, instance=profile)
@@ -459,54 +440,45 @@ def vocal_recommend(request):
     else:
         form = VocalRangeForm(instance=profile)
 
-    # ソートとページングのパラメータ
-    sort = request.GET.get("sort", "default")  # ?sort=default|listeners|name
-    page = int(request.GET.get("page", "1"))  # ?page=
+    sort = request.GET.get("sort", "default")
+    page = int(request.GET.get("page", "1"))
 
-    # 候補曲を取得
     candidates = top_tracks(limit=200)
-    reco = []
+    reco: list[Dict] = []
 
     for tr in candidates:
         term = f"{tr['artist']} {tr['title']}"
-        # Deezer で ISRC を取得
-        dz_hit = dz_search(term, limit=1)
-        isrc = dz_hit[0]["isrc"] if dz_hit and dz_hit[0].get("isrc") else None
-        feats = ms_audio(isrc=isrc) or ms_audio(query=term)
-        lo, hi = _estimate_pitch_range(feats)
 
-        # ユーザー声域でフィルタ
+        dz_hit = dz_search(term, limit=1)
+        if dz_hit:
+            tr["apple_preview"] = dz_hit[0].get("preview_url") or itunes_preview(term)
+        else:
+            tr["apple_preview"] = itunes_preview(term)
+
+        feat = gs_audio(query=term)
+        lo, hi = _estimate_pitch_range(feat)
+
         if profile.note_min <= lo and hi <= profile.note_max:
             tr.update(
                 pitch_low=lo,
                 pitch_high=hi,
-                apple_preview=itunes_preview(term),
                 youtube_url=f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}",
             )
             reco.append(tr)
 
-    # ソート
     if sort == "listeners":
         reco.sort(key=lambda x: -x.get("playcount", 0))
     elif sort == "name":
-        reco.sort(key=lambda x: x.get("title", "").lower())
+        reco.sort(key=lambda x: x["title"].lower())
 
-    # ページング
-    per_page = 20
-    total = len(reco)
-    start = (page - 1) * per_page
-    end = start + per_page
-    has_next = end < total
-    has_prev = start > 0
-    reco = reco[start:end]
-
+    per = 20
+    start, end = (page - 1) * per, (page - 1) * per + per
     context = {
         "form": form,
-        "tracks": reco,
+        "tracks": reco[start:end],
         "sort": sort,
         "page": page,
-        "has_next": has_next,
-        "has_prev": has_prev,
+        "has_next": end < len(reco),
+        "has_prev": start > 0,
     }
-
     return render(request, "vocal_recommend.html", context)
