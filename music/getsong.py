@@ -10,7 +10,7 @@ from django.conf import settings
 
 LOG = logging.getLogger(__name__)
 API_ROOT = "https://api.getsong.co"
-API_KEY  = settings.GETSONGBPM_KEY
+API_KEY  = 0000000000000000
 
 
 def _get(endpoint: str, params: Dict) -> Optional[Dict]:
