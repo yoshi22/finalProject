@@ -1,6 +1,6 @@
 {# templates/vocal_recommend.html #}
 {% extends "base.html" %}
-{% load static humanize %}      {# “spn” フィルタは不要になったので削除 #}
+{% load static humanize %}          {# “spn” フィルタは不要になったので削除 #}
 
 {% block title %}Vocal Range Recommendation{% endblock %}
 {% block css   %}{% endblock %}
@@ -8,15 +8,16 @@
 {% block content %}
 <h2>Search songs that fit your voice</h2>
 
-{# ------------------------ 声域フォーム ------------------------- #}
+{# ====================== ① 声域入力フォーム ====================== #}
 <form method="post" class="vocal-range-form">
   {% csrf_token %}
   {{ form.as_p }}
   <button type="submit" class="btn btn-primary">Update</button>
 </form>
 
-{# ------------------------ 並び替え＋BPM 範囲 ------------------- #}
-<form method="get" class="d-flex flex-wrap gap-2 mt-3 align-items-end">
+{# ====================== ② 並び替え & BPM ウィンドウ ============= #}
+<form method="get"
+      class="d-flex flex-wrap gap-2 mt-3 align-items-end">
   <div>
     Sort&nbsp;by:&nbsp;
     <select name="sort" onchange="this.form.submit()">
@@ -30,22 +31,28 @@
   <div>
     BPM&nbsp;
     <input type="number" name="bpm_min" value="{{ bpm_min }}" style="width:5rem">
-    –
+      –
     <input type="number" name="bpm_max" value="{{ bpm_max }}" style="width:5rem">
     <button class="btn btn-sm btn-secondary">Apply</button>
   </div>
 
+  {# ページ番号は “次/前” を押しても保持するため hidden で渡す #}
   <input type="hidden" name="page" value="{{ page }}">
 </form>
 
-{# ------------------------ 楽曲テーブル ------------------------- #}
+{# ====================== ③ 楽曲テーブル ========================= #}
 {% if tracks %}
   <table class="table table-sm mt-4">
     <thead>
       <tr>
-        <th>#</th><th>Artist</th><th>Title</th>
-        <th>Key</th><th>BPM</th>     {# ★ 追加列 #}
-        <th>Preview</th><th>Video</th><th>Add</th>
+        <th>#</th>
+        <th>Artist</th>
+        <th>Title</th>
+        <th>Key</th>
+        <th>BPM</th>
+        <th>Preview</th>
+        <th>Video</th>
+        <th>Add</th>
       </tr>
     </thead>
     <tbody>
@@ -54,13 +61,15 @@
           <td>{{ forloop.counter }}</td>
           <td>{{ t.artist }}</td>
           <td>{{ t.title }}</td>
-          <td>{{ t.key }}</td>       {# ★ 主キー #}
-          <td>{{ t.tempo }}</td>     {# ★ テンポ #}
+          <td>{{ t.key }}</td>
+          <td>{{ t.tempo }}</td>
 
           <td>
             {% if t.apple_preview %}
               <audio src="{{ t.apple_preview }}" controls preload="none"></audio>
-            {% else %}n/a{% endif %}
+            {% else %}
+              n/a
+            {% endif %}
           </td>
 
           <td>
@@ -75,13 +84,16 @@
                 {% csrf_token %}
                 <input type="hidden" name="artist" value="{{ t.artist }}">
                 <input type="hidden" name="track"  value="{{ t.title  }}">
+
                 <select name="playlist"
-                        onchange="this.nextElementSibling.style.display=this.value=='__new__'?'inline':'none'">
+                        onchange="this.nextElementSibling.style.display =
+                                  (this.value=='__new__') ? 'inline' : 'none'">
                   {% for pl in request.user.playlists.all %}
                     <option value="{{ pl.id }}">{{ pl.name }}</option>
                   {% endfor %}
                   <option value="__new__">＋ New playlist…</option>
                 </select>
+
                 <input name="new_name" style="display:none" placeholder="Playlist name">
                 <button>Add</button>
               </form>
@@ -92,11 +104,14 @@
     </tbody>
   </table>
 
-  {# ------------------------ ページング ------------------------- #}
+  {# ====================== ④ ページネーション ==================== #}
   <div class="mt-3 d-flex justify-content-between">
     {% if has_prev %}
       <a href="?sort={{ sort }}&bpm_min={{ bpm_min }}&bpm_max={{ bpm_max }}&page={{ page|add:-1 }}">← Previous</a>
-    {% else %}<span></span>{% endif %}
+    {% else %}
+      <span></span>
+    {% endif %}
+
     {% if has_next %}
       <a href="?sort={{ sort }}&bpm_min={{ bpm_min }}&bpm_max={{ bpm_max }}&page={{ page|add:1 }}">Next →</a>
     {% endif %}

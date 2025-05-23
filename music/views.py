@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import requests
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
@@ -25,7 +26,8 @@ from .utils import youtube_id
 from .itunes import itunes_preview
 from .lastfm import top_tracks
 from .deezer import search as dz_search            # Deezer preview / art
-from .getsong import audio_features as gs_audio    # Key / BPM via GetSongBPM
+from .getsong import audio_features as gs_audio, LOCK_KEY   # ← ★ 追記
+
 
 # ------------------------------------------------------------------
 # Logger
@@ -420,7 +422,7 @@ def remove_from_playlist(request, pk: int, track_id: int):
 
 
 # ------------------------------------------------------------------
-# Vocal recommendation – Key & Tempo filter
+# Vocal recommendation  –  GetSongBPM  +  Deezer preview
 # ------------------------------------------------------------------
 @login_required
 def vocal_recommend(request):
@@ -433,29 +435,30 @@ def vocal_recommend(request):
         user=request.user, defaults={"note_min": 60, "note_max": 72}
     )
 
-    # テンポ範囲（URL パラメータで上書き可）
+    # --- 画面パラメータ ------------------------------------------
     bpm_min = int(request.GET.get("bpm_min", 70))
     bpm_max = int(request.GET.get("bpm_max", 150))
     if bpm_min > bpm_max:
         bpm_min, bpm_max = bpm_max, bpm_min
 
-    sort  = request.GET.get("sort", "default")   # default|listeners|name|tempo
+    sort  = request.GET.get("sort", "default")        # default|listeners|name|tempo
     page  = int(request.GET.get("page", "1"))
-    per   = 20
+    per   = 5
 
-    candidates = top_tracks(limit=80)
+    # --- 候補曲取得（★ 80 → 40 に削減して API 負荷軽減） ---------
+    candidates = top_tracks(limit=5)
     reco: list[Dict] = []
 
     for tr in candidates:
         term = f"{tr['artist']} {tr['title']}"
 
-        # Deezer preview
+        # ① Deezer preview
         dz_hit = dz_search(term, limit=1)
         preview = dz_hit[0].get("preview_url") if dz_hit else itunes_preview(term)
 
-        # Key / Tempo
+        # ② Key / Tempo
         feat = gs_audio(query=term)
-        if not feat or not feat.get("key") or not feat.get("tempo"):
+        if not feat:          # ★ API 失敗時はスキップ
             continue
 
         key_name = feat["key"].upper()
@@ -464,7 +467,7 @@ def vocal_recommend(request):
         if root is None:
             continue
 
-        # フィルタ
+        # ③ フィルタ
         if not (profile.note_min <= root <= profile.note_max):
             continue
         if not (bpm_min <= tempo <= bpm_max):
@@ -478,7 +481,7 @@ def vocal_recommend(request):
         )
         reco.append(tr)
 
-    # ソート
+    # --- ソート ---------------------------------------------------
     if sort == "listeners":
         reco.sort(key=lambda x: -x.get("playcount", 0))
     elif sort == "name":
@@ -486,15 +489,25 @@ def vocal_recommend(request):
     elif sort == "tempo":
         reco.sort(key=lambda x: x["tempo"])
 
+    # --- ページネーション ----------------------------------------
     start, end = (page - 1) * per, page * per
     context = {
-        "tracks": reco[start:end],
-        "page": page,
-        "has_next": end < len(reco),
+        "tracks":   reco[start:end],
+        "page":     page,
+        "has_next": end   < len(reco),
         "has_prev": start > 0,
-        "sort": sort,
-        "bpm_min": bpm_min,
-        "bpm_max": bpm_max,
-        "profile": profile,
+        "sort":     sort,
+        "bpm_min":  bpm_min,
+        "bpm_max":  bpm_max,
+        "profile":  profile,
+        # フォームを再表示するため
+        "form":     VocalRangeForm(instance=profile),
     }
+
+    # ★ API 全滅で reco が空の場合は warning を表示
+    if not reco and not cache.get(LOCK_KEY):
+        messages.warning(request,
+            "GetSongBPM からデータを取得できませんでした。しばらく経ってから再試行してください。"
+        )
+
     return render(request, "vocal_recommend.html", context)
