@@ -427,35 +427,47 @@ def remove_from_playlist(request, pk: int, track_id: int):
 @login_required
 def vocal_recommend(request):
     """
-    GetSongBPM key/tempo × ユーザー声域 × BPM 範囲でレコメンド。
-    429 ロック時には警告を表示し、キャッシュ分だけ出す。
+    GetSongBPM key/tempo × ユーザー声域 × BPM でレコメンド。
+    429 ロック時は “曲少ないですよ” 警告を出す。
     """
+
     profile, _ = VocalProfile.objects.get_or_create(
         user=request.user, defaults={"note_min": 60, "note_max": 72}
     )
 
+    # ---- 声域フォーム -------------------------------------------------
+    if request.method == "POST":
+        form = VocalRangeForm(request.POST, instance=profile)
+        if form.is_valid():
+            form.save()
+            return redirect("vocal_recommend")
+    else:
+        form = VocalRangeForm(instance=profile)
+
+    # ---- URL パラメータ ---------------------------------------------
     bpm_min = int(request.GET.get("bpm_min", 70))
     bpm_max = int(request.GET.get("bpm_max", 150))
     if bpm_min > bpm_max:
         bpm_min, bpm_max = bpm_max, bpm_min
 
-    sort  = request.GET.get("sort", "default")          # default|listeners|name|tempo
+    sort  = request.GET.get("sort", "default")             # default|listeners|name|tempo
     page  = int(request.GET.get("page", 1))
     per   = 20
 
-    candidates = top_tracks(limit=80)
+    # ---- 候補曲収集 --------------------------------------------------
+    candidates = top_tracks(limit=100)                     # <- 少し余裕
     reco: list[Dict] = []
 
     for tr in candidates:
         term = f"{tr['artist']} {tr['title']}"
 
-        # preview (Deezer → iTunes fallback)
+        # Deezer preview → fallback iTunes
         dz_hit = dz_search(term, limit=1)
         preview = dz_hit[0].get("preview_url") if dz_hit else itunes_preview(term)
 
-        feat = gs_audio(query=term)
+        feat = gs_audio(query=term)                        # ★ キャッシュ優先
         if not feat:
-            continue
+            continue                                       # 取れなければスキップ
 
         key_name = feat["key"].upper()
         tempo    = feat["tempo"]
@@ -463,6 +475,7 @@ def vocal_recommend(request):
         if root is None:
             continue
 
+        # ---- フィルタ ------------------------------------------------
         if not (profile.note_min <= root <= profile.note_max):
             continue
         if not (bpm_min <= tempo <= bpm_max):
@@ -472,11 +485,12 @@ def vocal_recommend(request):
             key=key_name,
             tempo=tempo,
             apple_preview=preview,
-            youtube_url=f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}",
+            youtube_url=f"https://www.youtube.com/results?"
+                        f"search_query={urllib.parse.quote_plus(term)}",
         )
         reco.append(tr)
 
-    # ───────── sort & paginate ─────────
+    # ---- ソート ------------------------------------------------------
     if sort == "listeners":
         reco.sort(key=lambda x: -x.get("playcount", 0))
     elif sort == "name":
@@ -484,19 +498,22 @@ def vocal_recommend(request):
     elif sort == "tempo":
         reco.sort(key=lambda x: x["tempo"])
 
+    # ---- ページング --------------------------------------------------
     start, end = (page - 1) * per, page * per
 
-    # 429 ロック中で曲ゼロなら警告だけ出す
+    # 429 ロック中でヒット 0 件の場合だけ警告
     if not reco and cache.get(LOCK_KEY):
         messages.warning(
             request,
-            "GetSongBPM へのアクセスが制限されています。数分後にもう一度お試しください。"
+            "GetSongBPM にアクセス制限が掛かっています。"
+            "10 分ほどお待ち頂くと再度取得できます。"
         )
 
     return render(
         request,
         "vocal_recommend.html",
         {
+            "form":     form,          # ★★★ これを戻す ★★★
             "tracks":   reco[start:end],
             "page":     page,
             "has_next": end < len(reco),
