@@ -47,7 +47,7 @@ def audio_features(*, query: str) -> Optional[Dict]:
     if cached is not None:              # '' もヒットする
         return cached or None
 
-    look = urllib.parse.quote_plus(query)
+    look = urllib.parse.quote(query, safe="")
     data = _parse(_get("/search/", {"type": "song", "lookup": look, "limit": 1}))
 
     if data:                            # 成功

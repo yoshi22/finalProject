@@ -19,6 +19,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
+from math import floor, ceil
 
 from .forms import AddTrackForm, PlaylistRenameForm, SignUpForm, VocalRangeForm
 from .models import Artist, Playlist, PlaylistTrack, Track, VocalProfile
@@ -424,13 +425,26 @@ def remove_from_playlist(request, pk: int, track_id: int):
 # ------------------------------------------------------------------
 # Vocal recommendation  –  GetSongBPM  +  Deezer preview
 # ------------------------------------------------------------------
+def _root_in_range(root: int, lo: int, hi: int) -> bool:
+    """
+    root … _KEY2MIDI の 60-71 値
+    lo, hi … ユーザー声域 (MIDI 番号)
+    ルートを ±12n シフトしてどこか 1 つでも [lo,hi] に入るか判定
+    """
+    # 最も近いオクターブ範囲だけ調べればよい
+    low_shift  = floor((lo - root) / 12)
+    high_shift = ceil((hi - root) / 12)
+    for n in range(low_shift, high_shift + 1):
+        if lo <= root + 12 * n <= hi:
+            return True
+    return False
+
+
 @login_required
 def vocal_recommend(request):
     """
     GetSongBPM key/tempo × ユーザー声域 × BPM でレコメンド。
-    429 ロック時は “曲少ないですよ” 警告を出す。
     """
-
     profile, _ = VocalProfile.objects.get_or_create(
         user=request.user, defaults={"note_min": 60, "note_max": 72}
     )
@@ -450,12 +464,12 @@ def vocal_recommend(request):
     if bpm_min > bpm_max:
         bpm_min, bpm_max = bpm_max, bpm_min
 
-    sort  = request.GET.get("sort", "default")             # default|listeners|name|tempo
+    sort  = request.GET.get("sort", "default")
     page  = int(request.GET.get("page", 1))
     per   = 20
 
-    # ---- 候補曲収集 --------------------------------------------------
-    candidates = top_tracks(limit=100)                     # <- 少し余裕
+    # ---- 候補曲収集 (300 件) ----------------------------------------
+    candidates = top_tracks(limit=300)
     reco: list[Dict] = []
 
     for tr in candidates:
@@ -465,9 +479,9 @@ def vocal_recommend(request):
         dz_hit = dz_search(term, limit=1)
         preview = dz_hit[0].get("preview_url") if dz_hit else itunes_preview(term)
 
-        feat = gs_audio(query=term)                        # ★ キャッシュ優先
+        feat = gs_audio(query=term)
         if not feat:
-            continue                                       # 取れなければスキップ
+            continue
 
         key_name = feat["key"].upper()
         tempo    = feat["tempo"]
@@ -475,9 +489,10 @@ def vocal_recommend(request):
         if root is None:
             continue
 
-        # ---- フィルタ ------------------------------------------------
-        if not (profile.note_min <= root <= profile.note_max):
+        # --- フィルタ --------------------------------------------------
+        if not _root_in_range(root, profile.note_min, profile.note_max):
             continue
+
         if not (bpm_min <= tempo <= bpm_max):
             continue
 
@@ -490,6 +505,20 @@ def vocal_recommend(request):
         )
         reco.append(tr)
 
+    # ---- “全滅” なら BPM を自動拡大 -------------------------------
+    if not reco and not cache.get(LOCK_KEY):
+        wide_min, wide_max = 40, 160
+        if (bpm_min, bpm_max) != (wide_min, wide_max):
+            bpm_min, bpm_max = wide_min, wide_max
+            # 再フィルタ
+            for tr in list(candidates):  # shallow copy
+                feat = gs_audio(query=f"{tr['artist']} {tr['title']}")
+                if not feat:
+                    continue
+                tempo = feat["tempo"]
+                if wide_min <= tempo <= wide_max:
+                    reco.append(tr)
+
     # ---- ソート ------------------------------------------------------
     if sort == "listeners":
         reco.sort(key=lambda x: -x.get("playcount", 0))
@@ -498,22 +527,18 @@ def vocal_recommend(request):
     elif sort == "tempo":
         reco.sort(key=lambda x: x["tempo"])
 
-    # ---- ページング --------------------------------------------------
     start, end = (page - 1) * per, page * per
 
-    # 429 ロック中でヒット 0 件の場合だけ警告
     if not reco and cache.get(LOCK_KEY):
         messages.warning(
-            request,
-            "GetSongBPM にアクセス制限が掛かっています。"
-            "10 分ほどお待ち頂くと再度取得できます。"
+            request, "GetSongBPM のアクセス制限中です。10 分後にお試しください。"
         )
 
     return render(
         request,
         "vocal_recommend.html",
         {
-            "form":     form,          # ★★★ これを戻す ★★★
+            "form":     form,
             "tracks":   reco[start:end],
             "page":     page,
             "has_next": end < len(reco),
