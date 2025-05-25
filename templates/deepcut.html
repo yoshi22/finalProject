@@ -1,16 +1,45 @@
 {% extends "base.html" %}
 {% load static %}
+
 {% block content %}
 <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
 <h2>Deep-cut picks for {{ base_track }}</h2>
 
+
+<form class="d-flex flex-wrap gap-2 mb-3" method="get">
+
+  {# ① 元曲 (artist / track) を hidden で維持 #}
+  {% if base_track %}
+    <input type="hidden" name="artist" value="{{ request.GET.artist }}">
+    <input type="hidden" name="track"  value="{{ request.GET.track  }}">
+  {% endif %}
+
+  {# ② しきい値入力欄 #}
+  Max&nbsp;Playcount
+  <input type="number" name="max_play"
+         value="{{ max_play }}" style="width:7rem">
+
+  Ratio
+  <input type="number" step="0.05" min="0" max="1" name="ratio"
+         value="{{ ratio }}" style="width:5rem">
+
+  Tag
+  <input name="tag" value="{{ tag }}" placeholder="dreampop">
+
+  Year
+  <input name="year" value="{{ year }}" style="width:5rem">
+
+  <button class="btn btn-sm btn-secondary">Apply</button>
+</form>
+
+{# ───────────────────────── 曲カード一覧 ───────────────────────── #}
 <div class="grid">
   {% for t in tracks %}
     <div class="card">
       <h3>{{ t.name }}</h3>
       <p class="meta">{{ t.artist.name }} • {{ t.playcount|default:"?" }} plays</p>
 
-      {% if t.apple_preview or t.youtube_url %}            <!-- ★ changed -->
+      {% if t.apple_preview or t.youtube_url %}
         <details>
           {% include "_preview_player.html" with track=t %}
         </details>

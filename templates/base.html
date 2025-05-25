@@ -28,7 +28,6 @@
     <a href="{% url 'charts' %}">Charts</a>
     {% if request.user.is_authenticated %}
       <a href="{% url 'playlist_list' %}">My Playlists</a>
-      <a href="{% url 'vocal_recommend' %}">My Vocal Songs</a>
       <form action="{% url 'logout' %}" method="post" style="display:inline">
         {% csrf_token %}
         <button style="background:none;border:none;padding:0;color:var(--primary);cursor:pointer">
@@ -53,9 +52,6 @@
 </main>
 
 <footer>Powered by <a href="https://www.last.fm/api" target="_blank">Last.fm API</a></footer>
-<footer class="text-center text-xs text-gray-500 mt-16">
-  Key/BPM&nbsp;data&nbsp;©&nbsp;<a href="https://getsongbpm.com" target="_blank" rel="noopener">GetSongBPM.com</a>
-</footer>
 
 </body>
 </html>

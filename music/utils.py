@@ -1,10 +1,17 @@
 """
 Utility helpers
 ────────────────
-* YouTube Data API v3 を使って検索し、最初の videoId を返す `youtube_id()`
-  - API キーが無い／エラーの場合は **None** を返し、呼び出し側で
-    `/results` 検索リンクにフォールバックできるようにしてある。
-* 同一クエリは Django-cache（memcached / Redis 等）に 12 時間キャッシュ。
+* **youtube_id(query)**  
+    YouTube Data API v3 で検索し、最初の *videoId* を返す。  
+    - API キーが無い／エラーの場合は **None** を返し、呼び出し側で
+      `/results` 検索リンクにフォールバックできるようにしてある。  
+    - 同一クエリは Django-cache（memcached / Redis など）に 12 時間キャッシュ。
+
+* **ensure_preview_cached(term)**   ★ New!  
+    `"Artist Title"` 文字列から  
+      1. 30-sec プレビュー URL（Deezer → iTunes fallback）  
+      2. YouTube URL（`youtube_id` を利用。失敗時は `/results` リンク）  
+    を取得してタプルで返す。結果は 1 時間キャッシュ。
 """
 
 from __future__ import annotations
@@ -12,6 +19,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import urllib.parse
 import requests
 from django.conf import settings
 from django.core.cache import cache
@@ -29,7 +37,7 @@ YOUTUBE_API_KEY: str = (
 
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 YOUTUBE_MUSIC_CATEGORY = "10"  # Music
-CACHE_TTL = 60 * 60 * 12       # 12 h
+CACHE_TTL = 60 * 60 * 12       # 12 h  (YouTube id 用)
 
 _safe_re = re.compile(r"[^a-z0-9]+")
 
@@ -40,7 +48,7 @@ def _cache_key(term: str) -> str:
 
 
 # ──────────────────────────────────────────────────────────────
-#  Public helper
+#  Public helper – YouTube
 # ──────────────────────────────────────────────────────────────
 def youtube_id(query: str) -> str | None:
     """
@@ -93,3 +101,56 @@ def youtube_id(query: str) -> str | None:
     # 失敗結果もキャッシュしてスパム的な再試行を避ける
     cache.set(key, None, CACHE_TTL)
     return None
+
+
+# ──────────────────────────────────────────────────────────────
+#  Public helper – Preview & YouTube (shared)
+# ──────────────────────────────────────────────────────────────
+from .deezer import search as dz_search
+from .itunes import itunes_preview
+
+_PREV_TTL = 60 * 60          # 1 h
+_prev_key_re = re.compile(r"[^a-z0-9]+")
+
+
+def _prev_cache_key(term: str) -> str:
+    return "prev:" + _prev_key_re.sub("_", term.lower())
+
+
+def ensure_preview_cached(term: str) -> tuple[str | None, str]:
+    """
+    ``term`` (例: ``"Radiohead Creep"``) から
+
+      1. 30-sec preview URL  
+         - Deezer API でヒット ⇒ preview_url  
+         - ヒットしなければ iTunes Search にフォールバック  
+      2. YouTube URL  
+         - `youtube_id()` が取れれば watch URL  
+         - 取れなければ `/results?q=` 検索 URL
+
+    を **(preview_url | None, youtube_url)** のタプルで返す。  
+    成功／失敗を問わず 1 時間キャッシュ。
+    """
+    ck = _prev_cache_key(term)
+    cached: dict | None = cache.get(ck)
+
+    if cached:
+        return cached["apple"], cached["youtube"]
+
+    # ---------- Deezer → iTunes fallback -----------------------
+    prev_url: str | None = None
+    hit = dz_search(term, limit=1)
+    if hit and hit[0].get("preview_url"):
+        prev_url = hit[0]["preview_url"]
+    else:
+        prev_url = itunes_preview(term)
+
+    # ---------- YouTube ----------------------------------------
+    vid = youtube_id(term)
+    if vid:
+        yt_url = f"https://www.youtube.com/watch?v={vid}"
+    else:
+        yt_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}"
+
+    cache.set(ck, {"apple": prev_url, "youtube": yt_url}, _PREV_TTL)
+    return prev_url, yt_url
