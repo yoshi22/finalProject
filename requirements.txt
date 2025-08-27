@@ -143,3 +143,18 @@ websocket-client==1.8.0
 whitenoise==6.9.0
 widgetsnbextension==4.0.11
 wsproto==1.2.0
+
+# Testing
+pytest==7.4.3
+pytest-django==4.7.0
+pytest-cov==4.1.0
+
+# Code Quality
+black==23.11.0
+flake8==6.1.0
+isort==5.12.0
+pre-commit==3.5.0
+
+# Test Data Generation
+factory-boy==3.3.0
+faker==20.1.0
