@@ -8,6 +8,7 @@ Usage:
 """
 import logging
 import requests
+from typing import Optional
 from django.conf import settings
 
 API_ROOT = "https://ws.audioscrobbler.com/2.0/"
@@ -15,7 +16,7 @@ API_KEY = settings.LASTFM_API_KEY
 HEADERS = {"User-Agent": settings.LASTFM_USER_AGENT}
 
 
-def _call(method: str, **params) -> dict | None:
+def _call(method: str, **params) -> Optional[dict]:
     """Low-level GET → JSON or None on error."""
     params |= {"method": method, "api_key": API_KEY, "format": "json"}
     try:

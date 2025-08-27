@@ -4,7 +4,7 @@ Deezer Public API wrapper
 Docs: https://developers.deezer.com/api
 """
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 import requests, logging
 from django.conf import settings
 
@@ -12,7 +12,7 @@ DEEZER_ROOT = getattr(settings, "DEEZER_ROOT", "https://api.deezer.com")
 _log = logging.getLogger(__name__)
 
 
-def _get(url: str, params: Dict | None = None) -> Dict:
+def _get(url: str, params: Optional[Dict] = None) -> Dict:
     try:
         res = requests.get(url, params=params or {}, timeout=10)
         res.raise_for_status()

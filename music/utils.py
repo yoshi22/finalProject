@@ -86,7 +86,7 @@ def youtube_id(query: str) -> str | None:
         resp.raise_for_status()
 
         items = resp.json().get("items")
-        vid: str | None = items[0]["id"]["videoId"] if items else None
+        vid: Optional[str] = items[0]["id"]["videoId"] if items else None
         cache.set(key, vid, CACHE_TTL)
         return vid
 
@@ -108,6 +108,7 @@ def youtube_id(query: str) -> str | None:
 # ──────────────────────────────────────────────────────────────
 from .deezer import search as dz_search
 from .itunes import itunes_preview
+from typing import Optional, Tuple
 
 _PREV_TTL = 60 * 60          # 1 h
 _prev_key_re = re.compile(r"[^a-z0-9]+")
@@ -117,7 +118,7 @@ def _prev_cache_key(term: str) -> str:
     return "prev:" + _prev_key_re.sub("_", term.lower())
 
 
-def ensure_preview_cached(term: str) -> tuple[str | None, str]:
+def ensure_preview_cached(term: str) -> Tuple[Optional[str], str]:
     """
     ``term`` (例: ``"Radiohead Creep"``) から
 
@@ -132,13 +133,13 @@ def ensure_preview_cached(term: str) -> tuple[str | None, str]:
     成功／失敗を問わず 1 時間キャッシュ。
     """
     ck = _prev_cache_key(term)
-    cached: dict | None = cache.get(ck)
+    cached: Optional[dict] = cache.get(ck)
 
     if cached:
         return cached["apple"], cached["youtube"]
 
     # ---------- Deezer → iTunes fallback -----------------------
-    prev_url: str | None = None
+    prev_url: Optional[str] = None
     hit = dz_search(term, limit=1)
     if hit and hit[0].get("preview_url"):
         prev_url = hit[0]["preview_url"]

@@ -77,7 +77,7 @@ def ensure_preview(track: Track):
 # ------------------------------------------------------------------
 # 30-sec preview + YouTube URL 取得をキャッシュ付きで共通化
 # ------------------------------------------------------------------
-def ensure_preview_cached(term: str) -> tuple[str | None, str | None]:
+def ensure_preview_cached(term: str) -> Tuple[Optional[str], Optional[str]]:
     """
     引数 *term*（"artist title"）から
         • 30 sec Apple/Deezer preview URL
@@ -87,7 +87,7 @@ def ensure_preview_cached(term: str) -> tuple[str | None, str | None]:
     safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
     cache_key = "prev:" + safe_key
 
-    cached: dict[str, str | None] = cache.get(cache_key) or {}
+    cached: Dict[str, Optional[str]] = cache.get(cache_key) or {}
     if "apple" not in cached:
         cached["apple"] = itunes_preview(term)
     if "youtube" not in cached:
@@ -352,7 +352,7 @@ def deepcut(request):
             break
 
     # ── 5. プレビュー URL をくっつける ─────────────────────────
-    def ensure_preview_cached(term: str) -> tuple[str | None, str | None]:
+    def ensure_preview_cached(term: str) -> Tuple[Optional[str], Optional[str]]:
         safe_key = "prev:" + re.sub(r"[^a-z0-9]", "_", term.lower())
         cached = cache.get(safe_key) or {}
         if "apple" not in cached:

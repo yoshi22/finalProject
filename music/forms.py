@@ -1,3 +1,4 @@
+from typing import Optional, Union
 from django import forms
 from django.core import validators
 from django.contrib.auth.forms import UserCreationForm
@@ -27,7 +28,7 @@ class SPNField(forms.CharField):
     ]
 
     # Form input -> Python value (MIDI int)
-    def to_python(self, value: str | None) -> int | None:
+    def to_python(self, value: Optional[str]) -> Optional[int]:
         if value in self.empty_values:
             return None
         return spn_to_midi(value.strip())
