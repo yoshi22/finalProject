@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 urlpatterns = [
@@ -17,4 +17,6 @@ urlpatterns = [
     path("playlists/<int:pk>/", views.playlist_detail, name="playlist_detail"),
     path("playlist/add/", views.add_to_playlist, name="playlist_add"),
     
+    # API endpoints for content-based filtering
+    path("api/", include("music.api.urls")),
 ]

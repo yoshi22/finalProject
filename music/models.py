@@ -69,3 +69,11 @@ class PlaylistTrack(models.Model):
     class Meta:
         unique_together = ("playlist", "track")
         ordering = ["position"]
+
+# Import recommendation models
+from .models_recommendation import (
+    SimpleTrackFeatures,
+    TrackSimilarity,
+    UserPreferences,
+    RecommendationLog
+)
