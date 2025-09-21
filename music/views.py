@@ -1,8 +1,8 @@
 """
-views.py – NextTrack (Deezer + GetSongBPM 版)
+views.py – NextTrack (Deezer + GetSongBPM version)
 
-Spotify/MusicStax 依存を完全排除し、30-sec プレビューは Deezer
-（fallback に iTunes）、Key/BPM は GetSongBPM API を利用。
+Completely removed Spotify/MusicStax dependencies, using Deezer for 30-sec previews
+(with iTunes as fallback), and GetSongBPM API for Key/BPM data.
 """
 
 import json
@@ -27,7 +27,7 @@ from .utils import youtube_id
 from .itunes import itunes_preview
 from .lastfm import top_tracks
 from .deezer import search as dz_search            # Deezer preview / art
-from .getsong import audio_features as gs_audio, LOCK_KEY   # ← ★ 追記
+from .getsong import audio_features as gs_audio, LOCK_KEY   # Added for GetSongBPM integration
 
 
 # ------------------------------------------------------------------
@@ -75,21 +75,29 @@ def ensure_preview(track: Track):
         track.save(update_fields=["preview_url"])
 
 # ------------------------------------------------------------------
-# 30-sec preview + YouTube URL 取得をキャッシュ付きで共通化
+# Common function for getting 30-sec preview + YouTube URL with caching
 # ------------------------------------------------------------------
-def ensure_preview_cached(term: str) -> tuple[str | None, str | None]:
+def ensure_preview_cached(term: str) -> Tuple[Optional[str], Optional[str]]:
     """
-    引数 *term*（"artist title"）から
-        • 30 sec Apple/Deezer preview URL
+    From the argument *term* ("artist title"), returns:
+        • 30 sec Deezer/Apple preview URL (Deezer priority)
         • YouTube watch URL
-    を返す。結果は 1 時間 Django-cache に保存。
+    Caches success for 1 hour, failure for 1 minute.
     """
     safe_key = re.sub(r"[^a-z0-9]", "_", term.lower())
     cache_key = "prev:" + safe_key
 
-    cached: dict[str, str | None] = cache.get(cache_key) or {}
-    if "apple" not in cached:
-        cached["apple"] = itunes_preview(term)
+    cached: Dict[str, Optional[str]] = cache.get(cache_key) or {}
+    
+    # Refresh preview if not cached or is None
+    if "apple" not in cached or cached.get("apple") is None:
+        # Deezer preview with iTunes fallback
+        dz_hit = dz_search(term, limit=1)
+        preview = dz_hit[0].get("preview_url") if dz_hit else None
+        if not preview:
+            preview = itunes_preview(term)
+        cached["apple"] = preview
+        
     if "youtube" not in cached:
         vid = youtube_id(term)
         cached["youtube"] = (
@@ -97,7 +105,13 @@ def ensure_preview_cached(term: str) -> tuple[str | None, str | None]:
             if vid else
             f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}"
         )
-    cache.set(cache_key, cached, 60 * 60)
+    
+    # Use different TTL based on preview availability
+    if cached.get("apple"):
+        cache.set(cache_key, cached, 60 * 60)  # Success: cache for 1 hour
+    else:
+        cache.set(cache_key, cached, 60)  # Failure: cache for 1 minute only
+        
     return cached["apple"], cached["youtube"]
 
 
@@ -115,8 +129,8 @@ _KEY2MIDI = {
 
 def _estimate_pitch_range(feat: Optional[Dict]) -> Tuple[int, int]:
     """
-    GetSongBPM が返す key から “主音～主音+1oct” を推定して返す。
-    key が無い場合は C4–C5 を返す。
+    Estimates "root note to root note + 1 octave" from the key returned by GetSongBPM.
+    Returns C4-C5 if key is not available.
     """
     if not feat:
         return (60, 72)
@@ -133,7 +147,7 @@ def home(request):
 
 def track_search(request):
     """
-    Last.fm で検索し、iTunes Preview / YouTube URL を付与した結果一覧を表示。
+    Search with Last.fm and display results with iTunes Preview / YouTube URL attached.
     """
     q = request.GET.get("q", "").strip()
     if not q:
@@ -162,8 +176,15 @@ def track_search(request):
         cache_key = "prev:" + safe_key
 
         cached = cache.get(cache_key) or {}
-        if "apple" not in cached:
-            cached["apple"] = itunes_preview(term)
+        
+        # Deezer preview with iTunes fallback - refresh if None
+        if "apple" not in cached or cached.get("apple") is None:
+            dz_hit = dz_search(term, limit=1)
+            preview = dz_hit[0].get("preview_url") if dz_hit else None
+            if not preview:
+                preview = itunes_preview(term)
+            cached["apple"] = preview
+            
         if "youtube" not in cached:
             vid = youtube_id(term)
             cached["youtube"] = (
@@ -171,10 +192,21 @@ def track_search(request):
                 if vid
                 else f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}"
             )
-        cache.set(cache_key, cached, 60 * 60)
+        
+        # Use different TTL based on success/failure
+        if cached.get("apple"):
+            cache.set(cache_key, cached, 60 * 60)  # Success: cache for 1 hour
+        else:
+            cache.set(cache_key, cached, 60)  # Failure: cache for 1 minute only
+            
         t["apple_preview"] = cached["apple"]
         t["youtube_url"] = cached["youtube"]
 
+    # Breadcrumb navigation
+    breadcrumb_items = [
+        {"name": f"Search Results: {q}", "url": "#"}
+    ]
+    
     return render(
         request,
         "search_results.html",
@@ -185,6 +217,7 @@ def track_search(request):
             "sort": sort,
             "has_next": has_next,
             "has_prev": has_prev,
+            "breadcrumb_items": breadcrumb_items,
         },
     )
 
@@ -207,8 +240,15 @@ def similar(request):
         cache_key = "prev:" + safe_key
 
         cached = cache.get(cache_key) or {}
-        if "apple" not in cached:
-            cached["apple"] = itunes_preview(term)
+        
+        # Deezer preview with iTunes fallback - refresh if None
+        if "apple" not in cached or cached.get("apple") is None:
+            dz_hit = dz_search(term, limit=1)
+            preview = dz_hit[0].get("preview_url") if dz_hit else None
+            if not preview:
+                preview = itunes_preview(term)
+            cached["apple"] = preview
+            
         if "youtube" not in cached:
             vid = youtube_id(term)
             cached["youtube"] = (
@@ -216,11 +256,43 @@ def similar(request):
                 if vid
                 else f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}"
             )
-        cache.set(cache_key, cached, 60 * 60)
+        
+        # Use different TTL based on success/failure
+        if cached.get("apple"):
+            cache.set(cache_key, cached, 60 * 60)  # Success: cache for 1 hour
+        else:
+            cache.set(cache_key, cached, 60)  # Failure: cache for 1 minute only
+            
         t["apple_preview"] = cached["apple"]
         t["youtube_url"] = cached["youtube"]
+        
+        # Add similarity score and explanation
+        match = float(t.get("match", 0))
+        t["similarity_score"] = match
+        
+        # Generate explanation based on match score
+        if match > 0.8:
+            explanation = f"Very similar to {title} ({int(match*100)}% match)"
+        elif match > 0.5:
+            explanation = f"Shares musical elements with {title} ({int(match*100)}% match)"
+        elif match > 0.3:
+            explanation = f"Related to {title} through genre and style ({int(match*100)}% match)"
+        else:
+            explanation = f"Discovered through musical connections to {title}"
+        
+        t["explanation"] = explanation
 
-    ctx = {"base_track": f"{art} – {title}", "tracks": tracks}
+    # Breadcrumb navigation
+    breadcrumb_items = [
+        {"name": f"Similar to {title}", "url": "#"}
+    ]
+    
+    ctx = {
+        "base_track": f"{art} – {title}", 
+        "tracks": tracks,
+        "breadcrumb_items": breadcrumb_items,
+        "show_explanations": True  # Enable explanation display
+    }
     return render(request, "similar.html", ctx)
 
 
@@ -236,8 +308,15 @@ def live_chart(request):
         cache_key = "prev:" + safe_key
 
         cached = cache.get(cache_key) or {}
-        if "apple" not in cached:
-            cached["apple"] = itunes_preview(term)
+        
+        # Deezer preview with iTunes fallback - refresh if None
+        if "apple" not in cached or cached.get("apple") is None:
+            dz_hit = dz_search(term, limit=1)
+            preview = dz_hit[0].get("preview_url") if dz_hit else None
+            if not preview:
+                preview = itunes_preview(term)
+            cached["apple"] = preview
+            
         if "youtube" not in cached:
             vid = youtube_id(term)
             cached["youtube"] = (
@@ -245,11 +324,25 @@ def live_chart(request):
                 if vid
                 else f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(term)}"
             )
-        cache.set(cache_key, cached, 60 * 60)
+        
+        # Use different TTL based on success/failure
+        if cached.get("apple"):
+            cache.set(cache_key, cached, 60 * 60)  # Success: cache for 1 hour
+        else:
+            cache.set(cache_key, cached, 60)  # Failure: cache for 1 minute only
+            
         t["apple_preview"] = cached["apple"]
         t["youtube_url"] = cached["youtube"]
 
-    return render(request, "charts.html", {"tracks": tracks})
+    # Breadcrumb navigation
+    breadcrumb_items = [
+        {"name": "Global Charts", "url": "#"}
+    ]
+
+    return render(request, "charts.html", {
+        "tracks": tracks,
+        "breadcrumb_items": breadcrumb_items
+    })
 
 
 def artist_detail(request, name: str):
@@ -288,19 +381,138 @@ def track_detail(request, artist: str, title: str):
 
 
 ## ──────────────────────────────────────────────────────────────
-#  Deep-cut recommendation  – fallback 対応版
+#  Deep-cut recommendation – Enhanced Version
+# ──────────────────────────────────────────────────────────────
+def enhanced_deepcut(request):
+    """
+    Enhanced Deep-cut with exploration levels and explanations
+    """
+    import logging
+    from music.services.deepcut_engine import EnhancedDeepCutEngine
+    from music.services.explanation_generator import ExplanationGenerator
+    from music.models import Track as TrackModel, Artist as ArtistModel
+    
+    logger = logging.getLogger(__name__)
+    
+    # Get parameters
+    art = request.GET.get("artist", "")
+    title = request.GET.get("track", "")
+    exploration_level = float(request.GET.get("exploration_level", 0.5))
+    
+    if not (art and title):
+        return redirect("home")
+    
+    # Try to get track from database
+    try:
+        # First try to get from database
+        artist_obj, _ = ArtistModel.objects.get_or_create(name=art)
+        track_obj, created = TrackModel.objects.get_or_create(
+            title=title,
+            artist=artist_obj,
+            defaults={'mbid': '', 'playcount': 0}
+        )
+        
+        # If newly created, get info from Last.fm
+        if created or not track_obj.playcount:
+            info = call_lastfm({
+                "method": "track.getInfo",
+                "artist": art,
+                "track": title,
+                "autocorrect": 1
+            })
+            if info and "track" in info:
+                track_data = info["track"]
+                track_obj.playcount = int(track_data.get("playcount", 0))
+                track_obj.mbid = track_data.get("mbid", "")
+                track_obj.save()
+                
+                # Update artist playcount
+                if "artist" in track_data:
+                    artist_obj.playcount = int(track_data["artist"].get("playcount", 0))
+                    artist_obj.save()
+        
+        # Initialize engines
+        deepcut_engine = EnhancedDeepCutEngine()
+        explanation_generator = ExplanationGenerator()
+        
+        # Find deep-cuts
+        candidates = deepcut_engine.find_deepcuts(
+            seed_track=track_obj,
+            exploration_level=exploration_level,
+            limit=15,
+            genre_constraint=True
+        )
+        
+        # Generate explanations
+        deepcuts_with_explanations = []
+        for candidate in candidates:
+            explanation = explanation_generator.generate_explanation(
+                candidate,
+                track_obj
+            )
+            
+            # Get preview URLs (using the global function)
+            term = f"{candidate.track.artist.name} {candidate.track.title}"
+            apple_preview, youtube_url = ensure_preview_cached(term)
+            
+            deepcuts_with_explanations.append({
+                'candidate': candidate,
+                'explanation': explanation,
+                'apple_preview': apple_preview,
+                'youtube_url': youtube_url
+            })
+        
+        # Get exploration level description
+        exploration_description = deepcut_engine.get_exploration_description(exploration_level)
+        
+        ctx = {
+            "base_track": f"{art} – {title}",
+            "seed_track": track_obj,
+            "deepcuts": deepcuts_with_explanations,
+            "exploration_level": exploration_level,
+            "exploration_description": exploration_description,
+            "enhanced_mode": True
+        }
+        
+        return render(request, "deepcut_advanced.html", ctx)
+        
+    except Exception as e:
+        logger.error(f"Error in enhanced_deepcut: {e}")
+        # Fallback to original deepcut
+        return deepcut(request)
+
+## ──────────────────────────────────────────────────────────────
+#  Deep-cut recommendation  – with fallback support (Original)
 # ──────────────────────────────────────────────────────────────
 def deepcut(request):
     """
-    ① track.getSimilar  → ② artist.getTopTracks  → ③ tag.getTopTracks
-    と段階的にフォールバックし、必ず 15 曲程度返す。
+    Unified Deep-cut functionality
+    - Automatically switches between standard and Enhanced versions based on exploration level
+    - Progressive disclosure for gradual feature display
     """
+    import logging
+    from music.services.deepcut_engine import EnhancedDeepCutEngine
+    from music.services.explanation_generator import ExplanationGenerator
+    from music.models import Track as TrackModel, Artist as ArtistModel
+    
+    logger = logging.getLogger(__name__)
+    
+    # Get parameters
     art   = request.GET.get("artist", "")
     title = request.GET.get("track",  "")
     if not (art and title):
         return redirect("home")
+    
+    # Unified parameters
+    exploration_level = float(request.GET.get("exploration_level", 0.5))
+    show_advanced = request.GET.get("show_advanced", "false") == "true"
+    show_scores = request.GET.get("show_scores", "false") == "true"
+    show_explanations = request.GET.get("show_explanations", "false") == "true"
+    
+    # Mode determination: Enhanced mode when exploration_level is not 0.5 or when using advanced options
+    use_enhanced = (exploration_level != 0.5 or show_scores or show_explanations)
 
-    # ── 0. 元曲の再生回数とタグを取っておく ─────────────────
+    # Get basic information
     info = call_lastfm({"method": "track.getInfo",
                         "artist": art, "track": title, "autocorrect": 1})
     if not info:
@@ -308,6 +520,88 @@ def deepcut(request):
     base_play = int(info["track"].get("playcount", 1))
     tags      = [t["name"] for t in
                  info["track"].get("toptags", {}).get("tag", [])][:3]
+    
+    # Enhanced mode processing
+    if use_enhanced:
+        try:
+            # Get/create track from database
+            artist_obj, _ = ArtistModel.objects.get_or_create(name=art)
+            track_obj, created = TrackModel.objects.get_or_create(
+                title=title,
+                artist=artist_obj,
+                defaults={'mbid': info["track"].get("mbid", ""), 'playcount': base_play}
+            )
+            
+            if created or not track_obj.playcount:
+                track_obj.playcount = base_play
+                track_obj.mbid = info["track"].get("mbid", "")
+                track_obj.save()
+            
+            # Get recommendations using Enhanced engine
+            deepcut_engine = EnhancedDeepCutEngine()
+            explanation_generator = ExplanationGenerator()
+            
+            candidates = deepcut_engine.find_deepcuts(
+                seed_track=track_obj,
+                exploration_level=exploration_level,
+                limit=15,
+                genre_constraint=True
+            )
+            
+            # Generate explanations and get preview URLs
+            deepcuts_with_details = []
+            for candidate in candidates:
+                term = f"{candidate.track.artist.name} {candidate.track.title}"
+                apple_preview, youtube_url = ensure_preview_cached(term)
+                
+                item = {
+                    'candidate': candidate,
+                    'apple_preview': apple_preview,
+                    'youtube_url': youtube_url
+                }
+                
+                if show_explanations:
+                    item['explanation'] = explanation_generator.generate_explanation(
+                        candidate, track_obj
+                    )
+                
+                deepcuts_with_details.append(item)
+            
+            # Exploration level description
+            exploration_description = deepcut_engine.get_exploration_description(exploration_level)
+            
+            # Breadcrumb navigation
+            breadcrumb_items = [
+                {"name": f"Deep-cuts for {title}", "url": "#"}
+            ]
+            
+            # Prepare context
+            ctx = {
+                "base_track": f"{art} – {title}",
+                "seed_track": track_obj,
+                "deepcuts": deepcuts_with_details,
+                "exploration_level": exploration_level,
+                "exploration_description": exploration_description,
+                "use_enhanced": True,
+                "show_advanced": show_advanced,
+                "show_scores": show_scores,
+                "show_explanations": show_explanations,
+                # Preserve manual filter values
+                "max_play": request.GET.get("max_play", ""),
+                "ratio": request.GET.get("ratio", ""),
+                "tag": request.GET.get("tag", ""),
+                "year": request.GET.get("year", ""),
+                "breadcrumb_items": breadcrumb_items,
+            }
+            
+            return render(request, "deepcut_main.html", ctx)
+            
+        except Exception as e:
+            logger.error(f"Enhanced mode error, falling back to standard: {e}")
+            # Fall back to standard mode on error
+            use_enhanced = False
+    
+    # Standard mode processing (traditional logic)
 
     # ── 1. track.getSimilar ────────────────────────────────────
     data = call_lastfm({"method": "track.getSimilar",
@@ -330,9 +624,9 @@ def deepcut(request):
         extra = art_top.get("toptracks", {}).get("track", [])
         if isinstance(extra, dict): extra = [extra]
         picks.extend([t for t in extra if _accept(t)])
-        picks = picks[:30]                       # 重複は後で除外
+        picks = picks[:30]                       # Duplicates will be removed later
 
-    # ── 3. tag.getTopTracks (最初のタグだけ使う) ───────────────
+    # -- 3. tag.getTopTracks (use only the first tag) -------------──
     if len(picks) < 15 and tags:
         tag_top = call_lastfm({"method": "tag.getTopTracks",
                                "tag": tags[0], "limit": 100}) or {}
@@ -340,7 +634,7 @@ def deepcut(request):
         if isinstance(extra, dict): extra = [extra]
         picks.extend([t for t in extra if _accept(t)])
 
-    # ── 4. ユニーク化 & 上位 30 件に丸め込み ──────────────────
+    # -- 4. Make unique & limit to top 30 ----------------
     seen = set()
     uniq = []
     for t in picks:
@@ -351,35 +645,35 @@ def deepcut(request):
         if len(uniq) == 30:
             break
 
-    # ── 5. プレビュー URL をくっつける ─────────────────────────
-    def ensure_preview_cached(term: str) -> tuple[str | None, str | None]:
-        safe_key = "prev:" + re.sub(r"[^a-z0-9]", "_", term.lower())
-        cached = cache.get(safe_key) or {}
-        if "apple" not in cached:
-            cached["apple"] = itunes_preview(term)
-        if "youtube" not in cached:
-            vid = youtube_id(term)
-            cached["youtube"] = (f"https://www.youtube.com/watch?v={vid}"
-                                 if vid else None)
-        cache.set(safe_key, cached, 60 * 60)
-        return cached["apple"], cached["youtube"]
-
+    # -- 5. Attach preview URLs (using global function) ----────
     for t in uniq:
         term = f"{t.get('artist', {}).get('name','')} {t.get('name','')}"
         prev, ytb = ensure_preview_cached(term)
         t["apple_preview"] = prev
         t["youtube_url"]   = ytb
 
+    # Breadcrumb navigation
+    breadcrumb_items = [
+        {"name": f"Deep-cuts for {title}", "url": "#"}
+    ]
+    
     ctx = {
         "base_track": f"{art} – {title}",
-        "tracks": uniq[:15],                # 最終的に 15 曲
-        # 以下、フォーム値の再描画用
+        "tracks": uniq[:15],                # Final 15 tracks
+        "exploration_level": exploration_level,
+        "exploration_description": "Standard discovery mode - finding hidden gems",
+        "use_enhanced": False,
+        "show_advanced": show_advanced,
+        "show_scores": False,
+        "show_explanations": False,
+        # Below are for form value re-rendering
         "max_play": request.GET.get("max_play", ""),
         "ratio":    request.GET.get("ratio", ""),
         "tag":      request.GET.get("tag",   ""),
         "year":     request.GET.get("year",  ""),
+        "breadcrumb_items": breadcrumb_items,
     }
-    return render(request, "deepcut.html", ctx)
+    return render(request, "deepcut_main.html", ctx)
 
 
 
@@ -497,11 +791,11 @@ def remove_from_playlist(request, pk: int, track_id: int):
 # ------------------------------------------------------------------
 def _root_in_range(root: int, lo: int, hi: int) -> bool:
     """
-    root … _KEY2MIDI の 60-71 値
-    lo, hi … ユーザー声域 (MIDI 番号)
-    ルートを ±12n シフトしてどこか 1 つでも [lo,hi] に入るか判定
+    root ... _KEY2MIDI values 60-71
+    lo, hi ... user vocal range (MIDI number)
+    Shift root by ±12n and check if any fits within [lo,hi]
     """
-    # 最も近いオクターブ範囲だけ調べればよい
+    # Only need to check the nearest octave range
     low_shift  = floor((lo - root) / 12)
     high_shift = ceil((hi - root) / 12)
     for n in range(low_shift, high_shift + 1):

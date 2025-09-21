@@ -1,21 +1,14 @@
 {% extends "base.html" %}
 {% load static %}
 {% block content %}
-<a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
+{# Add breadcrumb navigation #}
+{% include "_breadcrumb.html" with breadcrumb_items=breadcrumb_items %}
+
 <h2>Similar to {{ base_track }}</h2>
 
 <div class="grid">
   {% for t in tracks %}
-    <div class="card">
-      <h3>{{ t.name }}</h3>
-      <p class="meta">{{ t.artist.name }}</p>
-
-      {% if t.apple_preview or t.youtube_url %}            <!-- ★ changed -->
-        <details>
-          {% include "_preview_player.html" with track=t %}
-        </details>
-      {% endif %}
-    </div>
+    {% include "_track_card.html" with track=t show_actions=True show_explanations=show_explanations %}
   {% endfor %}
 </div>
 {% endblock %}

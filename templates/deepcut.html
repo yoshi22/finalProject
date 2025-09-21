@@ -8,13 +8,13 @@
 
 <form class="d-flex flex-wrap gap-2 mb-3" method="get">
 
-  {# ① 元曲 (artist / track) を hidden で維持 #}
+  {# ① Keep original song (artist / track) as hidden #}
   {% if base_track %}
     <input type="hidden" name="artist" value="{{ request.GET.artist }}">
     <input type="hidden" name="track"  value="{{ request.GET.track  }}">
   {% endif %}
 
-  {# ② しきい値入力欄 #}
+  {# ② Threshold input fields #}
   Max&nbsp;Playcount
   <input type="number" name="max_play"
          value="{{ max_play }}" style="width:7rem">
@@ -37,10 +37,12 @@
   {% for t in tracks %}
     <div class="card">
       <h3>{{ t.name }}</h3>
-      <p class="meta">{{ t.artist.name }} • {{ t.playcount|default:"?" }} plays</p>
+      <p class="meta">{{ t.artist.name }} • {{ t.playcount|
+        ault:"?" }} plays</p>
 
       {% if t.apple_preview or t.youtube_url %}
         <details>
+          <summary>Preview</summary>
           {% include "_preview_player.html" with track=t %}
         </details>
       {% endif %}

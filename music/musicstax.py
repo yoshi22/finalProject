@@ -41,8 +41,8 @@ def _get(endpoint: str, params: Dict) -> Optional[Dict]:
 # 公開関数  ✨ views から import される名前
 # ------------------------------------------------------------------
 def audio_features(*,
-                   isrc: str | None = None,
-                   query: str | None = None) -> Optional[Dict]:
+                   isrc: Optional[str] = None,
+                   query: Optional[str] = None) -> Optional[Dict]:
     """
     Audio features を取得して正規化して返す。
     優先順位: ISRC → テキスト検索

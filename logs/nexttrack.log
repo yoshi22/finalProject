@@ -1,0 +1,20 @@
+INFO 2025-09-21 21:46:36,424 autoreload 6412 4593604096 Watching for file changes with StatReloader
+INFO 2025-09-21 21:47:00,690 basehttp 6412 123145396215808 "GET / HTTP/1.1" 200 13530
+INFO 2025-09-21 21:49:30,281 basehttp 6412 123145396215808 "GET /similar/?artist=Sabrina%20Carpenter&track=Tears HTTP/1.1" 200 125057
+INFO 2025-09-21 21:49:30,448 basehttp 6412 123145396215808 "GET /static/style.css HTTP/1.1" 200 1677
+INFO 2025-09-21 21:53:27,541 autoreload 6412 4593604096 /Users/muroiyousuke/Library/Mobile Documents/com~apple~CloudDocs/Documents/ComputerScience/25Apr/Code/music/models.py changed, reloading.
+INFO 2025-09-21 21:53:29,990 autoreload 14768 4583740928 Watching for file changes with StatReloader
+INFO 2025-09-21 21:53:52,305 autoreload 14768 4583740928 /Users/muroiyousuke/Library/Mobile Documents/com~apple~CloudDocs/Documents/ComputerScience/25Apr/Code/music/views.py changed, reloading.
+INFO 2025-09-21 21:53:53,310 autoreload 15428 4732274176 Watching for file changes with StatReloader
+INFO 2025-09-21 21:53:57,455 autoreload 15428 4732274176 /Users/muroiyousuke/Library/Mobile Documents/com~apple~CloudDocs/Documents/ComputerScience/25Apr/Code/music/urls.py changed, reloading.
+INFO 2025-09-21 21:53:58,187 autoreload 15451 4766336512 Watching for file changes with StatReloader
+INFO 2025-09-21 21:54:02,184 autoreload 15451 4766336512 /Users/muroiyousuke/Library/Mobile Documents/com~apple~CloudDocs/Documents/ComputerScience/25Apr/Code/music/api/feedback.py changed, reloading.
+INFO 2025-09-21 21:54:03,101 autoreload 15642 4460459520 Watching for file changes with StatReloader
+INFO 2025-09-21 21:54:08,411 autoreload 15642 4460459520 /Users/muroiyousuke/Library/Mobile Documents/com~apple~CloudDocs/Documents/ComputerScience/25Apr/Code/music/api/urls.py changed, reloading.
+INFO 2025-09-21 21:54:10,124 autoreload 15669 4604151296 Watching for file changes with StatReloader
+INFO 2025-09-21 21:54:41,559 autoreload 15669 4604151296 /Users/muroiyousuke/Library/Mobile Documents/com~apple~CloudDocs/Documents/ComputerScience/25Apr/Code/music/utils/feature_flags.py changed, reloading.
+INFO 2025-09-21 21:54:42,687 autoreload 16297 4452759040 Watching for file changes with StatReloader
+INFO 2025-09-21 21:58:39,033 autoreload 16297 4452759040 /Users/muroiyousuke/Library/Mobile Documents/com~apple~CloudDocs/Documents/ComputerScience/25Apr/Code/music/views.py changed, reloading.
+INFO 2025-09-21 21:58:40,039 autoreload 21577 4513170944 Watching for file changes with StatReloader
+INFO 2025-09-21 21:59:28,595 basehttp 21577 123145512239104 "GET /similar/?artist=Sabrina%20Carpenter&track=Tears HTTP/1.1" 200 125057
+INFO 2025-09-21 21:59:28,757 basehttp 21577 123145512239104 "GET /static/style.css HTTP/1.1" 304 0

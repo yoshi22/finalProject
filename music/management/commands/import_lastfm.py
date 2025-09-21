@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import requests
 from django.conf import settings
@@ -47,7 +47,7 @@ class Command(BaseCommand):
         self.import_artist(opts["artist"], opts.get("track"))
 
     # ------------------------------------------------------------------
-    def import_artist(self, artist_name: str, seed_track: str | None):
+    def import_artist(self, artist_name: str, seed_track: Optional[str]):
         self.stdout.write(f"Fetching artist info: {artist_name}")
         a_data = lfm({"method": "artist.getInfo", "artist": artist_name})
         if not a_data:

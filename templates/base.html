@@ -18,12 +18,15 @@
   <!-- Home link -->
   <a href="{% url 'home' %}" class="logo">NextTrack</a>
   
-  <!--Hamberger button-->
-  <button class="hamburger" aria-label="Menu"
-  onclick="document.getElementById('main-nav').classList.toggle('open')">
-  ☰
+  <!--Hamburger button-->
+  <button class="hamburger" 
+          aria-label="Toggle navigation menu"
+          aria-expanded="false"
+          aria-controls="main-nav"
+          onclick="NextTrack.toggleMobileMenu()">
+    <span class="hamburger-icon" aria-hidden="true">☰</span>
   </button>
-  <nav id="main-nav" >
+  <nav id="main-nav" aria-label="Main navigation">
     <a href="{% url 'home' %}">Home</a>
     <a href="{% url 'charts' %}">Charts</a>
     {% if request.user.is_authenticated %}
@@ -52,6 +55,498 @@
 </main>
 
 <footer>Powered by <a href="https://www.last.fm/api" target="_blank">Last.fm API</a></footer>
+
+<script>
+// NextTrack JavaScript Module - Core UI Functions
+const NextTrack = {
+  // Mobile Menu Toggle
+  toggleMobileMenu() {
+    const nav = document.getElementById('main-nav');
+    const button = document.querySelector('.hamburger');
+    const isOpen = nav.classList.contains('open');
+    
+    nav.classList.toggle('open');
+    button.setAttribute('aria-expanded', !isOpen);
+    
+    // Trap focus when menu is open on mobile
+    if (!isOpen && window.innerWidth <= 768) {
+      this.trapFocus(nav);
+    }
+  },
+  
+  // Focus Management
+  trapFocus(element) {
+    const focusableElements = element.querySelectorAll(
+      'a[href], button, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstFocusable = focusableElements[0];
+    const lastFocusable = focusableElements[focusableElements.length - 1];
+    
+    element.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        if (e.shiftKey) {
+          if (document.activeElement === firstFocusable) {
+            lastFocusable.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastFocusable) {
+            firstFocusable.focus();
+            e.preventDefault();
+          }
+        }
+      }
+      if (e.key === 'Escape') {
+        NextTrack.toggleMobileMenu();
+      }
+    });
+  },
+  
+  // Show Add to Playlist Modal (for track cards)
+  showAddToPlaylist(button) {
+    const artist = button.dataset.artist;
+    const track = button.dataset.track;
+    
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('playlist-modal');
+    if (!modal) {
+      modal = this.createPlaylistModal();
+    }
+    
+    // Set track data
+    modal.querySelector('[name="artist"]').value = artist;
+    modal.querySelector('[name="track"]').value = track;
+    modal.querySelector('.modal-title').textContent = `Add "${track}" to Playlist`;
+    
+    // Show modal
+    modal.style.display = 'block';
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    
+    // Focus first input
+    modal.querySelector('select[name="playlist"]').focus();
+  },
+  
+  // Create Playlist Modal
+  createPlaylistModal() {
+    const modal = document.createElement('div');
+    modal.id = 'playlist-modal';
+    modal.className = 'modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-labelledby', 'modal-title');
+    modal.setAttribute('aria-hidden', 'true');
+    
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modal-title" class="modal-title">Add to Playlist</h2>
+          <button type="button" class="modal-close" onclick="NextTrack.closeModal()" aria-label="Close modal">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <form action="{% url 'playlist_add' %}" method="post" class="modal-body">
+          {% csrf_token %}
+          <input type="hidden" name="artist" value="">
+          <input type="hidden" name="track" value="">
+          <div class="form-group">
+            <label for="playlist-select">Choose playlist:</label>
+            <select name="playlist" id="playlist-select" class="form-control" onchange="NextTrack.toggleNewPlaylist(this)">
+              {% for pl in request.user.playlists.all %}
+              <option value="{{ pl.id }}">{{ pl.name }}</option>
+              {% endfor %}
+              <option value="__new__">+ Create new playlist...</option>
+            </select>
+          </div>
+          <div class="form-group" id="new-playlist-name" style="display:none">
+            <label for="new-name">New playlist name:</label>
+            <input type="text" name="new_name" id="new-name" class="form-control" placeholder="Enter playlist name">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="NextTrack.closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add to Playlist</button>
+          </div>
+        </form>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        this.closeModal();
+      }
+    });
+    
+    return modal;
+  },
+  
+  // Toggle New Playlist Input
+  toggleNewPlaylist(select) {
+    const newPlaylistDiv = document.getElementById('new-playlist-name');
+    if (select.value === '__new__') {
+      newPlaylistDiv.style.display = 'block';
+      newPlaylistDiv.querySelector('input').focus();
+    } else {
+      newPlaylistDiv.style.display = 'none';
+    }
+  },
+  
+  // Close Modal
+  closeModal() {
+    const modal = document.getElementById('playlist-modal');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+  },
+  
+  // Show Toast Notification
+  showToast(message, type = 'info', duration = 3000) {
+    // Create toast container if it doesn't exist
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'toast-container';
+      container.setAttribute('aria-live', 'polite');
+      container.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(container);
+    }
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${type}`;
+    toast.setAttribute('role', 'alert');
+    
+    const icon = {
+      success: '✓',
+      error: '✕',
+      warning: '⚠',
+      info: 'ℹ'
+    }[type] || 'ℹ';
+    
+    toast.innerHTML = `
+      <span class="toast-icon" aria-hidden="true">${icon}</span>
+      <span class="toast-message">${message}</span>
+      <button type="button" class="toast-close" aria-label="Close notification" onclick="this.parentElement.remove()">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Auto remove after duration
+    setTimeout(() => {
+      toast.style.animation = 'slideOut 0.3s ease forwards';
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+  },
+  
+  // Initialize on DOM ready
+  init() {
+    // Close mobile menu on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const nav = document.getElementById('main-nav');
+        if (nav.classList.contains('open')) {
+          this.toggleMobileMenu();
+        }
+      }
+    });
+    
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Alt + S: Focus search
+      if (e.altKey && e.key === 's') {
+        e.preventDefault();
+        document.querySelector('.search-bar input').focus();
+      }
+      
+      // Alt + H: Go home
+      if (e.altKey && e.key === 'h') {
+        e.preventDefault();
+        window.location.href = '{% url "home" %}';
+      }
+    });
+  }
+};
+
+// Make NextTrack globally available
+window.NextTrack = NextTrack;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  NextTrack.init();
+});
+</script>
+
+<style>
+/* Mobile Navigation Styles */
+#main-nav {
+  transition: var(--transition-normal, 300ms ease);
+}
+
+@media (max-width: 768px) {
+  #main-nav {
+    position: fixed;
+    top: 60px;
+    left: -100%;
+    width: 80%;
+    max-width: 300px;
+    height: calc(100vh - 60px);
+    background: var(--card, #ffffff);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    flex-direction: column;
+    padding: 1rem;
+    overflow-y: auto;
+    z-index: 999;
+  }
+  
+  #main-nav.open {
+    left: 0;
+  }
+  
+  #main-nav a,
+  #main-nav button {
+    display: block;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border, #e5e5e5);
+  }
+}
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: var(--z-modal, 2000);
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--card, #ffffff);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border, #e5e5e5);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--muted, #606060);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-body {
+  padding: 1rem;
+}
+
+.modal-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--border, #e5e5e5);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+/* Toast Notification Styles */
+.toast-container {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: var(--z-toast, 3000);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.toast {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 250px;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  animation: slideIn 0.3s ease;
+}
+
+.toast--success {
+  border-left: 4px solid var(--color-success, #4CAF50);
+}
+
+.toast--error {
+  border-left: 4px solid var(--color-error, #F44336);
+}
+
+.toast--warning {
+  border-left: 4px solid var(--color-warning, #FFC107);
+}
+
+.toast--info {
+  border-left: 4px solid var(--primary, #e50914);
+}
+
+.toast-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--muted, #606060);
+  padding: 0;
+  margin-left: auto;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -40%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* Accessibility - Skip Links */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--primary, #e50914);
+  color: white;
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  z-index: 9999;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Focus Indicators */
+:focus-visible {
+  outline: 2px solid var(--primary, #e50914);
+  outline-offset: 2px;
+}
+
+/* Button Loading State */
+.btn--loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.btn--loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  margin-left: -8px;
+  margin-top: -8px;
+  border: 2px solid var(--primary, #e50914);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
 
 </body>
 </html>

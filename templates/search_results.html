@@ -1,6 +1,8 @@
 {% extends "base.html" %}{% block content %}
-<a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
-<h2>Results for “{{ query }}”</h2>
+{# Add breadcrumb navigation #}
+{% include "_breadcrumb.html" with breadcrumb_items=breadcrumb_items %}
+
+<h2>Results for "{{ query }}"</h2>
 
   <form style="margin-bottom:.8rem">
     <input type="hidden" name="q" value="{{ query }}">
@@ -15,40 +17,9 @@
   
 <div class="grid">
 {% for t in tracks %}
-  <div class="card">
-    <h3>{{ t.name }}</h3>
-    <p class="meta">{{ t.artist }}</p>
-    {# ---------- NEW preview button ---------- #}
-
-    {% if t.apple_preview or t.youtube_url %}
-      <details style="margin-bottom:6px">
-        <summary>Preview</summary>
-        {% include "_preview_player.html" with track=t %}
-      </details>
-    {% endif %}
-
-    <a class="btn" href="{% url 'similar' %}?artist={{ t.artist|urlencode:"" }}&track={{ t.name|urlencode:"" }}">Similar</a>
-    <a class="btn" href="{% url 'deepcut' %}?artist={{ t.artist|urlencode:"" }}&track={{ t.name|urlencode:"" }}">Deep-cut</a>
-
-    {% if request.user.is_authenticated %}
-      <form action="{% url 'playlist_add' %}" method="post" style="margin-top:6px">
-        {% csrf_token %}
-        <input type="hidden" name="artist" value="{{ t.artist }}">
-        <input type="hidden" name="track"  value="{{ t.name  }}">
-        <select name="playlist"
-                onchange="this.nextElementSibling.style.display=this.value=='__new__'?'inline':'none'">
-          {% for pl in request.user.playlists.all %}
-            <option value="{{ pl.id }}">{{ pl.name }}</option>
-          {% endfor %}
-          <option value="__new__">＋ New playlist…</option>
-        </select>
-        <input name="new_name" style="display:none" placeholder="Playlist name">
-        <button>Add</button>
-      </form>
-    {% endif %}
-  </div>
+  {% include "_track_card.html" with track=t show_actions=True %}
 {% empty %}
-  <p>No results found.</p>
+  <p class="no-results">No results found for "{{ query }}".</p>
 {% endfor %}
 </div>
 

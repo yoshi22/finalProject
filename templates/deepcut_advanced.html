@@ -1,0 +1,475 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="deepcut-enhanced-container">
+    <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="back-btn">← Back</a>
+    
+    <h2>Deep-cut Discoveries for {{ base_track }}</h2>
+    
+    <!-- Exploration Level Control -->
+    <div class="exploration-control">
+        <form method="get" id="exploration-form">
+            <input type="hidden" name="artist" value="{{ request.GET.artist }}">
+            <input type="hidden" name="track" value="{{ request.GET.track }}">
+            
+            <label for="exploration-slider">
+                Exploration Level: 
+                <span id="exploration-value">{{ exploration_level|floatformat:1 }}</span>
+            </label>
+            
+            <div class="slider-container">
+                <span class="slider-label">Safe</span>
+                <input type="range" 
+                       id="exploration-slider" 
+                       name="exploration_level"
+                       min="0" 
+                       max="1" 
+                       step="0.1" 
+                       value="{{ exploration_level }}">
+                <span class="slider-label">Extreme</span>
+                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+            </div>
+            
+            <p class="slider-description">
+                {{ exploration_description }}
+            </p>
+        </form>
+    </div>
+    
+    <!-- Results Grid -->
+    <div class="deepcut-results grid">
+        {% for item in deepcuts %}
+        <div class="deepcut-card" data-track-id="{{ item.candidate.track.id }}">
+            <div class="track-info">
+                <h3>{{ item.candidate.track.title }}</h3>
+                <p class="artist">{{ item.candidate.track.artist.name }}</p>
+                
+                <!-- Score Visualization -->
+                <div class="score-visualization">
+                    <div class="score-bar">
+                        {% with sim_width=item.candidate.similarity_score|floatformat:2 %}
+                        {% with nov_width=item.candidate.novelty_score|floatformat:2 %}
+                        {% with pop_width=item.candidate.popularity_score|floatformat:2 %}
+                        <div class="score-segment similarity" 
+                             style="width: {% widthratio sim_width 1 100 %}%"
+                             title="Similarity: {{ sim_width }}">
+                        </div>
+                        <div class="score-segment novelty" 
+                             style="width: {% widthratio nov_width 1 100 %}%"
+                             title="Novelty: {{ nov_width }}">
+                        </div>
+                        <div class="score-segment rarity" 
+                             style="width: {% widthratio pop_width 1 100 %}%"
+                             title="Rarity: {{ pop_width }}">
+                        </div>
+                        {% endwith %}
+                        {% endwith %}
+                        {% endwith %}
+                    </div>
+                    <div class="score-legend">
+                        <span class="legend-item similarity">Similar</span>
+                        <span class="legend-item novelty">Novel</span>
+                        <span class="legend-item rarity">Rare</span>
+                    </div>
+                </div>
+                
+                <!-- Explanation -->
+                <div class="explanation">
+                    <p>{{ item.explanation }}</p>
+                </div>
+                
+                <!-- Metadata -->
+                <div class="track-metadata">
+                    <span class="playcount">
+                        🎵 {{ item.candidate.track.playcount|default:"Unknown" }} plays
+                    </span>
+                    <span class="overall-score">
+                        Score: {{ item.candidate.overall_score|floatformat:2 }}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Preview & Actions -->
+            <div class="track-actions">
+                {% if item.apple_preview or item.youtube_url %}
+                <details class="preview-section">
+                    <summary>🔊 Preview</summary>
+                    {% if item.apple_preview %}
+                    <audio controls preload="none">
+                        <source src="{{ item.apple_preview }}" type="audio/mpeg">
+                    </audio>
+                    {% endif %}
+                    {% if item.youtube_url %}
+                    <a href="{{ item.youtube_url }}" target="_blank" class="youtube-link">
+                        Watch on YouTube
+                    </a>
+                    {% endif %}
+                </details>
+                {% endif %}
+                
+                <!-- Feedback Buttons -->
+                <div class="feedback-buttons">
+                    <button class="btn-feedback btn-like" 
+                            data-track-id="{{ item.candidate.track.id }}"
+                            data-feedback="like"
+                            title="Like">
+                        👍
+                    </button>
+                    <button class="btn-feedback btn-dislike" 
+                            data-track-id="{{ item.candidate.track.id }}"
+                            data-feedback="dislike"
+                            title="Dislike">
+                        👎
+                    </button>
+                    <button class="btn-feedback btn-save" 
+                            data-track-id="{{ item.candidate.track.id }}"
+                            data-feedback="save"
+                            title="Save">
+                        💾
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="no-results">No deep-cuts found. Try adjusting the exploration level.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.deepcut-enhanced-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.exploration-control {
+    background: var(--card-bg, #f9f9f9);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+}
+
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin: 15px 0;
+}
+
+#exploration-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, 
+        #4CAF50 0%, 
+        #FFC107 50%, 
+        #F44336 100%);
+    outline: none;
+}
+
+#exploration-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary-color, #007bff);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+#exploration-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary-color, #007bff);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.slider-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary, #666);
+    white-space: nowrap;
+}
+
+.slider-description {
+    font-style: italic;
+    color: var(--text-secondary, #666);
+    margin-top: 10px;
+}
+
+.deepcut-card {
+    background: var(--card-bg, white);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.deepcut-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.track-info h3 {
+    margin: 0 0 5px 0;
+    color: var(--text-primary, #333);
+}
+
+.track-info .artist {
+    color: var(--text-secondary, #666);
+    margin: 0 0 15px 0;
+}
+
+.score-visualization {
+    margin: 15px 0;
+}
+
+.score-bar {
+    display: flex;
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg-secondary, #e9ecef);
+}
+
+.score-segment {
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.score-segment.similarity {
+    background: #4CAF50;
+}
+
+.score-segment.novelty {
+    background: #2196F3;
+}
+
+.score-segment.rarity {
+    background: #FF9800;
+}
+
+.score-legend {
+    display: flex;
+    gap: 20px;
+    margin-top: 8px;
+    font-size: 0.75rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+}
+
+.legend-item::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 5px;
+}
+
+.legend-item.similarity::before {
+    background: #4CAF50;
+}
+
+.legend-item.novelty::before {
+    background: #2196F3;
+}
+
+.legend-item.rarity::before {
+    background: #FF9800;
+}
+
+.explanation {
+    background: var(--bg-secondary, #f8f9fa);
+    padding: 12px;
+    border-radius: 6px;
+    margin: 15px 0;
+}
+
+.explanation p {
+    margin: 0;
+    font-style: italic;
+    color: var(--text-secondary, #666);
+    font-size: 0.9rem;
+}
+
+.track-metadata {
+    display: flex;
+    gap: 20px;
+    font-size: 0.875rem;
+    color: var(--text-secondary, #666);
+    margin: 10px 0;
+}
+
+.track-actions {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color, #dee2e6);
+}
+
+.preview-section {
+    margin-bottom: 10px;
+}
+
+.preview-section summary {
+    cursor: pointer;
+    user-select: none;
+    padding: 5px;
+    background: var(--bg-secondary, #f8f9fa);
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.preview-section audio {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.youtube-link {
+    display: inline-block;
+    margin-top: 10px;
+    color: var(--primary-color, #007bff);
+    text-decoration: none;
+}
+
+.youtube-link:hover {
+    text-decoration: underline;
+}
+
+.feedback-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.btn-feedback {
+    background: transparent;
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1.2rem;
+}
+
+.btn-feedback:hover {
+    transform: scale(1.1);
+    background: var(--bg-secondary, #f8f9fa);
+}
+
+.btn-feedback.active {
+    background: var(--primary-color, #007bff);
+    border-color: var(--primary-color, #007bff);
+}
+
+.no-results {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary, #666);
+}
+
+@media (max-width: 768px) {
+    .deepcut-results {
+        grid-template-columns: 1fr;
+    }
+    
+    .slider-container {
+        flex-wrap: wrap;
+    }
+    
+    #exploration-slider {
+        width: 100%;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const slider = document.getElementById('exploration-slider');
+    const valueDisplay = document.getElementById('exploration-value');
+    
+    // Update value display on slider change
+    slider.addEventListener('input', function() {
+        valueDisplay.textContent = parseFloat(this.value).toFixed(1);
+    });
+    
+    // Feedback buttons
+    document.querySelectorAll('.btn-feedback').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const trackId = this.dataset.trackId;
+            const feedbackType = this.dataset.feedback;
+            const explorationLevel = slider.value;
+            
+            // Toggle active state
+            if (this.classList.contains('active')) {
+                this.classList.remove('active');
+                return;
+            }
+            
+            // Remove active from other buttons for this track
+            this.parentElement.querySelectorAll('.btn-feedback').forEach(b => {
+                if (b !== this) b.classList.remove('active');
+            });
+            this.classList.add('active');
+            
+            // Send feedback to API
+            fetch('/api/feedback/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    track_id: trackId,
+                    seed_track_id: {{ seed_track.id|default:"null" }},
+                    feedback_type: feedbackType,
+                    exploration_level: parseFloat(explorationLevel),
+                    session_id: sessionStorage.getItem('session_id') || generateSessionId()
+                })
+            }).then(response => {
+                if (response.ok) {
+                    console.log('Feedback submitted successfully');
+                }
+            }).catch(error => {
+                console.error('Error submitting feedback:', error);
+            });
+        });
+    });
+    
+    // Generate session ID if not exists
+    function generateSessionId() {
+        const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        sessionStorage.setItem('session_id', sessionId);
+        return sessionId;
+    }
+    
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %}
